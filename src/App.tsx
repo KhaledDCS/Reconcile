@@ -1,1027 +1,916 @@
 // @ts-nocheck
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 
-// ─── DESIGN TOKENS ───────────────────────────────────────────────────────────
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Cabinet+Grotesk:wght@400;500;700;800;900&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #f5f2eb; }
+  html, body, #root { height: 100%; }
+  body { background: #0f1117; font-family: 'Inter', sans-serif; color: #e2e8f0; -webkit-font-smoothing: antialiased; }
   :root {
-    --ink: #1a1814;
-    --ink2: #4a4640;
-    --ink3: #8a8680;
-    --paper: #f5f2eb;
-    --paper2: #ede9e0;
-    --paper3: #e2ddd4;
-    --rule: #d4cfc6;
-    --accent: #c84b2f;
-    --accent2: #e8b84b;
-    --green: #2d6a4f;
-    --blue: #1a4f7a;
-    --mono: 'IBM Plex Mono', monospace;
-    --sans: 'Cabinet Grotesk', sans-serif;
+    --bg: #0f1117; --surface: #161b27; --surface2: #1e2535; --surface3: #252d40;
+    --border: #2a3348; --border2: #334060;
+    --text: #e2e8f0; --text2: #8892a4; --text3: #5a6478;
+    --accent: #4f7df3; --accent-dim: rgba(79,125,243,0.15); --accent-border: rgba(79,125,243,0.35);
+    --green: #22c55e; --green-dim: rgba(34,197,94,0.12); --green-border: rgba(34,197,94,0.3);
+    --amber: #f59e0b; --amber-dim: rgba(245,158,11,0.12); --amber-border: rgba(245,158,11,0.3);
+    --red: #ef4444; --red-dim: rgba(239,68,68,0.12); --red-border: rgba(239,68,68,0.3);
+    --purple: #a855f7; --purple-dim: rgba(168,85,247,0.12); --purple-border: rgba(168,85,247,0.3);
+    --mono: 'JetBrains Mono', monospace; --sans: 'Inter', sans-serif;
+    --radius: 10px; --radius-lg: 14px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4); --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
   }
   ::-webkit-scrollbar { width: 4px; height: 4px; }
-  ::-webkit-scrollbar-track { background: var(--paper2); }
-  ::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 2px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
   input, select, textarea {
-    font-family: var(--mono);
-    font-size: 12px;
-    background: var(--paper);
-    border: 1px solid var(--rule);
-    color: var(--ink);
-    border-radius: 6px;
-    padding: 7px 10px;
-    outline: none;
-    transition: border-color 0.15s;
-    width: 100%;
+    font-family: var(--mono); font-size: 12px; background: var(--surface);
+    border: 1px solid var(--border); color: var(--text); border-radius: var(--radius);
+    padding: 8px 12px; outline: none; transition: border-color 0.15s, box-shadow 0.15s; width: 100%;
   }
-  input:focus, select:focus, textarea:focus { border-color: var(--ink2); }
-  select { cursor: pointer; }
-  button { cursor: pointer; font-family: var(--sans); font-weight: 700; border: none; transition: all 0.15s; }
-  .btn-primary {
-    background: var(--ink);
-    color: var(--paper);
-    padding: 9px 18px;
-    border-radius: 8px;
-    font-size: 13px;
-    letter-spacing: 0.01em;
-  }
-  .btn-primary:hover { background: var(--accent); }
-  .btn-secondary {
-    background: var(--paper2);
-    color: var(--ink);
-    padding: 9px 18px;
-    border-radius: 8px;
-    font-size: 13px;
-    border: 1px solid var(--rule);
-  }
-  .btn-secondary:hover { background: var(--paper3); }
-  .btn-ghost {
-    background: transparent;
-    color: var(--ink2);
-    padding: 7px 12px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-family: var(--mono);
-    font-weight: 500;
-  }
-  .btn-ghost:hover { background: var(--paper2); color: var(--ink); }
-  .card {
-    background: var(--paper);
-    border: 1px solid var(--rule);
-    border-radius: 12px;
-  }
-  .tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-family: var(--mono);
-    font-size: 11px;
-    font-weight: 500;
-  }
-  .tag-green { background: #d4edda; color: #1a5c35; border: 1px solid #b8dfc6; }
-  .tag-amber { background: #fef3cd; color: #7d5a00; border: 1px solid #fde08d; }
-  .tag-red { background: #fde8e4; color: #8b2013; border: 1px solid #f5bdb5; }
-  .tag-blue { background: #dce8f5; color: #0f3a5c; border: 1px solid #b8d4ed; }
-  .tag-gray { background: var(--paper2); color: var(--ink2); border: 1px solid var(--rule); }
-  .tag-ai { background: #f0e8ff; color: #4a1c8a; border: 1px solid #d4b8f5; }
-  .modal-overlay {
-    position: fixed; inset: 0;
-    background: rgba(26,24,20,0.55);
-    backdrop-filter: blur(3px);
-    z-index: 100;
-    display: flex; align-items: center; justify-content: center;
-    padding: 20px;
-    animation: fadeIn 0.15s ease;
-  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+  input::placeholder, textarea::placeholder { color: var(--text3); }
+  select { cursor: pointer; } select option { background: var(--surface2); }
+  button { cursor: pointer; font-family: var(--sans); font-weight: 600; border: none; transition: all 0.15s; outline: none; }
+  .btn-primary { background: var(--accent); color: white; padding: 9px 18px; border-radius: var(--radius); font-size: 13px; box-shadow: 0 1px 3px rgba(79,125,243,0.3); }
+  .btn-primary:hover { background: #3d6de0; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { background: var(--surface3); color: var(--text3); cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-secondary { background: var(--surface2); color: var(--text); padding: 9px 18px; border-radius: var(--radius); font-size: 13px; border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--surface3); border-color: var(--border2); }
+  .btn-ghost { background: transparent; color: var(--text2); padding: 7px 12px; border-radius: 8px; font-size: 12px; font-weight: 500; }
+  .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+  .btn-danger { background: var(--red-dim); color: var(--red); padding: 7px 14px; border-radius: 8px; font-size: 12px; border: 1px solid var(--red-border); }
+  .btn-danger:hover { background: rgba(239,68,68,0.2); }
+  .btn-success { background: var(--green-dim); color: var(--green); padding: 9px 18px; border-radius: var(--radius); font-size: 13px; border: 1px solid var(--green-border); }
+  .btn-success:hover { background: rgba(34,197,94,0.2); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+  .tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px; font-family: var(--mono); font-size: 11px; font-weight: 500; }
+  .tag-green { background: var(--green-dim); color: var(--green); border: 1px solid var(--green-border); }
+  .tag-amber { background: var(--amber-dim); color: var(--amber); border: 1px solid var(--amber-border); }
+  .tag-red { background: var(--red-dim); color: var(--red); border: 1px solid var(--red-border); }
+  .tag-blue { background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent-border); }
+  .tag-gray { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+  .tag-purple { background: var(--purple-dim); color: var(--purple); border: 1px solid var(--purple-border); }
+  .tag-ai { background: var(--purple-dim); color: var(--purple); border: 1px solid var(--purple-border); }
+  .modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.7); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 20px; animation: fadeIn 0.15s ease; }
   @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
-  @keyframes slideUp { from { transform: translateY(12px); opacity:0 } to { transform: translateY(0); opacity:1 } }
-  .modal-box { animation: slideUp 0.2s ease; }
-  .tx-row { border-bottom: 1px solid var(--rule); transition: background 0.1s; }
-  .tx-row:hover { background: var(--paper2); }
-  .tx-row.selected { background: #fef8e8; }
-  .spin { animation: spin 0.8s linear infinite; }
+  @keyframes slideUp { from { transform: translateY(16px); opacity:0 } to { transform: translateY(0); opacity:1 } }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .pulse { animation: pulse 1.5s ease-in-out infinite; }
-  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.4 } }
-  .drop-zone {
-    border: 2px dashed var(--rule);
-    border-radius: 10px;
-    transition: all 0.2s;
-    cursor: pointer;
-  }
-  .drop-zone:hover, .drop-zone.drag-over {
-    border-color: var(--ink2);
-    background: var(--paper2);
-  }
-  .progress-bar {
-    height: 3px;
-    background: var(--rule);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-  .progress-fill {
-    height: 100%;
-    background: var(--green);
-    border-radius: 2px;
-    transition: width 0.4s ease;
-  }
-  .match-confidence {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .conf-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-  }
-  .tooltip {
-    position: relative;
-  }
-  .tooltip:hover::after {
-    content: attr(data-tip);
-    position: absolute;
-    bottom: 120%;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--ink);
-    color: var(--paper);
-    font-family: var(--mono);
-    font-size: 10px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    white-space: nowrap;
-    z-index: 99;
-    pointer-events: none;
-  }
-  .nav-tab {
-    padding: 10px 18px;
-    font-family: var(--mono);
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--ink3);
-    border-bottom: 2px solid transparent;
-    cursor: pointer;
-    transition: all 0.15s;
-    background: none;
-    border-top: none; border-left: none; border-right: none;
-    white-space: nowrap;
-  }
-  .nav-tab.active { color: var(--ink); border-bottom-color: var(--accent); }
-  .nav-tab:hover:not(.active) { color: var(--ink2); }
-  .sidebar-label {
-    font-family: var(--mono);
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--ink3);
-    margin-bottom: 8px;
-    display: block;
-  }
+  .modal-box { animation: slideUp 0.2s ease; }
+  .tx-row { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  .tx-row:hover { background: var(--surface2); }
+  .tx-row.selected { background: rgba(79,125,243,0.08); }
+  .drop-zone { border: 2px dashed var(--border2); border-radius: var(--radius-lg); transition: all 0.2s; cursor: pointer; }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: var(--accent-dim); }
+  .progress-bar { height: 3px; background: var(--surface3); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.4s ease; }
+  .nav-tab { padding: 10px 16px; font-size: 13px; font-weight: 500; color: var(--text3); border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.15s; background: none; border-top: none; border-left: none; border-right: none; white-space: nowrap; }
+  .nav-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .nav-tab:hover:not(.active) { color: var(--text2); }
+  .sidebar-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 6px; display: block; }
+  .input-group { display: flex; flex-direction: column; gap: 6px; }
+  .input-label { font-size: 12px; font-weight: 500; color: var(--text2); }
+  .alert-error { background: var(--red-dim); border: 1px solid var(--red-border); color: var(--red); border-radius: var(--radius); padding: 10px 14px; font-size: 12px; font-family: var(--mono); }
+  .alert-warning { background: var(--amber-dim); border: 1px solid var(--amber-border); color: var(--amber); border-radius: var(--radius); padding: 10px 14px; font-size: 12px; }
+  .alert-success { background: var(--green-dim); border: 1px solid var(--green-border); color: var(--green); border-radius: var(--radius); padding: 10px 14px; font-size: 12px; }
+  .user-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  .user-row:hover { background: var(--surface2); }
+  .user-row:last-child { border-bottom: none; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; }
+  .conf-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .tooltip { position: relative; }
+  .tooltip:hover::after { content: attr(data-tip); position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%); background: var(--surface3); color: var(--text); font-family: var(--mono); font-size: 10px; padding: 4px 8px; border-radius: 6px; white-space: nowrap; z-index: 99; pointer-events: none; border: 1px solid var(--border2); }
+  .login-bg { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); position: relative; overflow: hidden; padding: 20px; }
+  .login-bg::before { content: ''; position: absolute; width: 700px; height: 700px; background: radial-gradient(circle, rgba(79,125,243,0.07) 0%, transparent 65%); top: -200px; left: -200px; pointer-events: none; }
+  .login-bg::after { content: ''; position: absolute; width: 500px; height: 500px; background: radial-gradient(circle, rgba(168,85,247,0.05) 0%, transparent 65%); bottom: -100px; right: -100px; pointer-events: none; }
 `;
 
-// ─── MOCK DATA ────────────────────────────────────────────────────────────────
-const SAMPLE_TRANSACTIONS = [
-  { id: 1, date: "2025-03-01", vendor: "Amazon Web Services", description: "Cloud infrastructure - Feb", amount: 4821.50, card: "Visa ••4291", cardholder: "Jordan Lee" },
-  { id: 2, date: "2025-03-02", vendor: "Slack Technologies", description: "Team plan monthly subscription", amount: 312.00, card: "Visa ••4291", cardholder: "Jordan Lee" },
-  { id: 3, date: "2025-03-03", vendor: "Delta Air Lines", description: "SFO → JFK — conference travel", amount: 689.00, card: "Amex ••8812", cardholder: "Alex Kim" },
-  { id: 4, date: "2025-03-04", vendor: "Marriott Hotels", description: "NY accommodation 3 nights", amount: 1240.00, card: "Amex ••8812", cardholder: "Alex Kim" },
-  { id: 5, date: "2025-03-05", vendor: "DoorDash", description: "Team working lunch", amount: 187.40, card: "Visa ••4291", cardholder: "Jordan Lee" },
-  { id: 6, date: "2025-03-06", vendor: "Amazon.com", description: "Office supplies - Q1 restock", amount: 94.32, card: "Visa ••4291", cardholder: "Morgan Chen" },
-  { id: 7, date: "2025-03-07", vendor: "Uber", description: "Airport transfer - JFK", amount: 62.15, card: "Amex ••8812", cardholder: "Alex Kim" },
-  { id: 8, date: "2025-03-08", vendor: "Zoom Video", description: "Pro annual renewal", amount: 149.90, card: "Visa ••4291", cardholder: "Jordan Lee" },
-  { id: 9, date: "2025-03-09", vendor: "LinkedIn", description: "Recruiter lite seat — March", amount: 825.00, card: "Amex ••8812", cardholder: "Morgan Chen" },
-  { id: 10, date: "2025-03-10", vendor: "Acme Legal Group", description: "Contract review services", amount: 3500.00, card: "Amex ••8812", cardholder: "Alex Kim" },
-  { id: 11, date: "2025-03-12", vendor: "Salesforce", description: "CRM seats - March", amount: 2100.00, card: "Visa ••4291", cardholder: "Jordan Lee" },
-  { id: 12, date: "2025-03-14", vendor: "FedEx", description: "Overnight shipping - client samples", amount: 78.60, card: "Visa ••4291", cardholder: "Morgan Chen" },
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const INITIAL_USERS = [
+  { id: "u1", name: "Admin User",  email: "admin@company.com",  password: "admin123", role: "admin",      active: true, card: null,         createdAt: "2025-01-01" },
+  { id: "u2", name: "Jordan Lee",  email: "jordan@company.com", password: "pass123",  role: "cardholder", active: true, card: "Visa ••4291", createdAt: "2025-01-10" },
+  { id: "u3", name: "Alex Kim",    email: "alex@company.com",   password: "pass123",  role: "cardholder", active: true, card: "Amex ••8812", createdAt: "2025-01-10" },
+  { id: "u4", name: "Morgan Chen", email: "morgan@company.com", password: "pass123",  role: "cardholder", active: true, card: "Visa ••4291", createdAt: "2025-01-15" },
+  { id: "u5", name: "Sam Rivera",  email: "sam@company.com",    password: "pass123",  role: "reviewer",   active: true, card: null,         createdAt: "2025-01-05" },
 ];
 
-const GL_RULES = {
-  "amazon web services": { gl: "6100", glName: "Cloud Infrastructure", dept: "Engineering" },
-  "aws": { gl: "6100", glName: "Cloud Infrastructure", dept: "Engineering" },
-  "slack": { gl: "6110", glName: "Software & SaaS", dept: "Operations" },
-  "zoom": { gl: "6110", glName: "Software & SaaS", dept: "Operations" },
-  "google": { gl: "6110", glName: "Software & SaaS", dept: "Engineering" },
-  "microsoft": { gl: "6110", glName: "Software & SaaS", dept: "Operations" },
-  "openai": { gl: "6110", glName: "Software & SaaS", dept: "Engineering" },
-  "salesforce": { gl: "6120", glName: "CRM & Sales Tools", dept: "Sales" },
-  "hubspot": { gl: "6120", glName: "CRM & Sales Tools", dept: "Marketing" },
-  "delta": { gl: "6210", glName: "Airfare", dept: "G&A" },
-  "united airlines": { gl: "6210", glName: "Airfare", dept: "G&A" },
-  "american airlines": { gl: "6210", glName: "Airfare", dept: "G&A" },
-  "marriott": { gl: "6220", glName: "Hotels & Lodging", dept: "G&A" },
-  "hilton": { gl: "6220", glName: "Hotels & Lodging", dept: "G&A" },
-  "airbnb": { gl: "6220", glName: "Hotels & Lodging", dept: "G&A" },
-  "uber": { gl: "6230", glName: "Ground Transportation", dept: "G&A" },
-  "lyft": { gl: "6230", glName: "Ground Transportation", dept: "G&A" },
-  "doordash": { gl: "6300", glName: "Meals & Entertainment", dept: "G&A" },
-  "grubhub": { gl: "6300", glName: "Meals & Entertainment", dept: "G&A" },
-  "uber eats": { gl: "6300", glName: "Meals & Entertainment", dept: "G&A" },
-  "amazon.com": { gl: "6020", glName: "Office Supplies", dept: "Operations" },
-  "amazon": { gl: "6020", glName: "Office Supplies", dept: "Operations" },
-  "staples": { gl: "6020", glName: "Office Supplies", dept: "Operations" },
-  "fedex": { gl: "6600", glName: "Shipping & Postage", dept: "Operations" },
-  "ups": { gl: "6600", glName: "Shipping & Postage", dept: "Operations" },
-  "linkedin": { gl: "6500", glName: "Recruiting & HR", dept: "HR" },
-  "indeed": { gl: "6500", glName: "Recruiting & HR", dept: "HR" },
+const GL_RULES_DATA = {
+  "amazon web services": { gl:"6100", glName:"Cloud Infrastructure", dept:"Engineering" },
+  "aws":                 { gl:"6100", glName:"Cloud Infrastructure", dept:"Engineering" },
+  "slack":               { gl:"6110", glName:"Software & SaaS",      dept:"Operations"  },
+  "zoom":                { gl:"6110", glName:"Software & SaaS",      dept:"Operations"  },
+  "google":              { gl:"6110", glName:"Software & SaaS",      dept:"Engineering" },
+  "microsoft":           { gl:"6110", glName:"Software & SaaS",      dept:"Operations"  },
+  "openai":              { gl:"6110", glName:"Software & SaaS",      dept:"Engineering" },
+  "salesforce":          { gl:"6120", glName:"CRM & Sales Tools",     dept:"Sales"       },
+  "delta":               { gl:"6210", glName:"Airfare",               dept:"G&A"         },
+  "united airlines":     { gl:"6210", glName:"Airfare",               dept:"G&A"         },
+  "marriott":            { gl:"6220", glName:"Hotels & Lodging",      dept:"G&A"         },
+  "hilton":              { gl:"6220", glName:"Hotels & Lodging",      dept:"G&A"         },
+  "airbnb":              { gl:"6220", glName:"Hotels & Lodging",      dept:"G&A"         },
+  "uber":                { gl:"6230", glName:"Ground Transportation", dept:"G&A"         },
+  "lyft":                { gl:"6230", glName:"Ground Transportation", dept:"G&A"         },
+  "doordash":            { gl:"6300", glName:"Meals & Entertainment", dept:"G&A"         },
+  "grubhub":             { gl:"6300", glName:"Meals & Entertainment", dept:"G&A"         },
+  "amazon.com":          { gl:"6020", glName:"Office Supplies",       dept:"Operations"  },
+  "amazon":              { gl:"6020", glName:"Office Supplies",       dept:"Operations"  },
+  "staples":             { gl:"6020", glName:"Office Supplies",       dept:"Operations"  },
+  "fedex":               { gl:"6600", glName:"Shipping & Postage",    dept:"Operations"  },
+  "ups":                 { gl:"6600", glName:"Shipping & Postage",    dept:"Operations"  },
+  "linkedin":            { gl:"6500", glName:"Recruiting & HR",       dept:"HR"          },
 };
 
 const DEFAULT_GL_ACCOUNTS = [
-  { code: "6020", name: "Office Supplies" },
-  { code: "6100", name: "Cloud Infrastructure" },
-  { code: "6110", name: "Software & SaaS" },
-  { code: "6120", name: "CRM & Sales Tools" },
-  { code: "6210", name: "Airfare" },
-  { code: "6220", name: "Hotels & Lodging" },
-  { code: "6230", name: "Ground Transportation" },
-  { code: "6300", name: "Meals & Entertainment" },
-  { code: "6400", name: "Professional Services" },
-  { code: "6500", name: "Recruiting & HR" },
-  { code: "6600", name: "Shipping & Postage" },
-  { code: "6800", name: "Miscellaneous" },
+  { code:"6020", name:"Office Supplies"      },
+  { code:"6100", name:"Cloud Infrastructure" },
+  { code:"6110", name:"Software & SaaS"      },
+  { code:"6120", name:"CRM & Sales Tools"    },
+  { code:"6210", name:"Airfare"              },
+  { code:"6220", name:"Hotels & Lodging"     },
+  { code:"6230", name:"Ground Transportation"},
+  { code:"6300", name:"Meals & Entertainment"},
+  { code:"6400", name:"Professional Services"},
+  { code:"6500", name:"Recruiting & HR"      },
+  { code:"6600", name:"Shipping & Postage"   },
+  { code:"6800", name:"Miscellaneous"        },
 ];
 
-const DEPARTMENTS = ["Engineering", "Sales", "Marketing", "Operations", "G&A", "HR", "Finance", "Legal"];
-const CARDHOLDERS = ["All cardholders", "Jordan Lee", "Alex Kim", "Morgan Chen"];
-const ROLES = [
-  { name: "Jordan Lee", role: "Cardholder", card: "Visa ••4291", avatar: "JL", color: "#1a4f7a" },
-  { name: "Alex Kim", role: "Cardholder", card: "Amex ••8812", avatar: "AK", color: "#2d6a4f" },
-  { name: "Morgan Chen", role: "Cardholder", card: "Visa ••4291", avatar: "MC", color: "#7d4a1a" },
-  { name: "Sam Rivera", role: "Finance Reviewer", card: null, avatar: "SR", color: "#c84b2f" },
+const DEPARTMENTS = ["Engineering","Sales","Marketing","Operations","G&A","HR","Finance","Legal"];
+
+const SAMPLE_TXS = [
+  { id:1,  date:"2025-03-01", vendor:"Amazon Web Services", description:"Cloud infrastructure Feb",  amount:4821.50, card:"Visa ••4291",  userId:"u2" },
+  { id:2,  date:"2025-03-02", vendor:"Slack Technologies",  description:"Team plan monthly",         amount:312.00,  card:"Visa ••4291",  userId:"u2" },
+  { id:3,  date:"2025-03-03", vendor:"Delta Air Lines",     description:"SFO→JFK conference",        amount:689.00,  card:"Amex ••8812",  userId:"u3" },
+  { id:4,  date:"2025-03-04", vendor:"Marriott Hotels",     description:"NY accommodation 3 nights", amount:1240.00, card:"Amex ••8812",  userId:"u3" },
+  { id:5,  date:"2025-03-05", vendor:"DoorDash",            description:"Team working lunch",         amount:187.40,  card:"Visa ••4291",  userId:"u2" },
+  { id:6,  date:"2025-03-06", vendor:"Amazon.com",          description:"Office supplies Q1",         amount:94.32,   card:"Visa ••4291",  userId:"u4" },
+  { id:7,  date:"2025-03-07", vendor:"Uber",                description:"Airport transfer JFK",       amount:62.15,   card:"Amex ••8812",  userId:"u3" },
+  { id:8,  date:"2025-03-08", vendor:"Zoom Video",          description:"Pro annual renewal",         amount:149.90,  card:"Visa ••4291",  userId:"u2" },
+  { id:9,  date:"2025-03-09", vendor:"LinkedIn",            description:"Recruiter lite March",       amount:825.00,  card:"Amex ••8812",  userId:"u4" },
+  { id:10, date:"2025-03-10", vendor:"Acme Legal Group",    description:"Contract review",            amount:3500.00, card:"Amex ••8812",  userId:"u3" },
+  { id:11, date:"2025-03-12", vendor:"Salesforce",          description:"CRM seats March",            amount:2100.00, card:"Visa ••4291",  userId:"u2" },
+  { id:12, date:"2025-03-14", vendor:"FedEx",               description:"Overnight shipping",         amount:78.60,   card:"Visa ••4291",  userId:"u4" },
 ];
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+const fmt = (n) => "$" + (+n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtDate = (d) => { const [,m,day]=d.split("-"); return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+m-1]} ${+day}`; };
+const fmtDateTime = (iso) => { const d=new Date(iso); return d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+" · "+d.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}); };
+let _seq = 1;
+const genReconId = () => `RECON-${new Date().getFullYear()}-${String(_seq++).padStart(4,"0")}`;
 
 function autoAssign(vendor) {
   const v = vendor.toLowerCase();
-  for (const [key, val] of Object.entries(GL_RULES)) {
-    if (v.includes(key)) return { ...val, confidence: "high", autoAssigned: true };
-  }
-  return { gl: "6800", glName: "Miscellaneous", dept: "G&A", confidence: "low", autoAssigned: true };
+  for (const [k,val] of Object.entries(GL_RULES_DATA)) { if (v.includes(k)) return {...val, confidence:"high", autoAssigned:true}; }
+  return { gl:"6800", glName:"Miscellaneous", dept:"G&A", confidence:"low", autoAssigned:true };
 }
 
 function initTx() {
-  return SAMPLE_TRANSACTIONS.map(t => {
-    const assigned = autoAssign(t.vendor);
-    return {
-      ...t,
-      ...assigned,
-      status: "pending",
-      receipt: null,
-      receiptMatch: null,
-      memo: "",
-      flagReason: "",
-      submittedAt: null,
-      reviewedAt: null,
-      reviewedBy: null,
-    };
-  });
+  return SAMPLE_TXS.map(t => ({ ...t, ...autoAssign(t.vendor), status:"pending", receipt:null, receiptMatch:null, memo:"", flagReason:"", reconId:null }));
 }
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-const fmt = (n) => "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fmtDate = (d) => {
-  const [y, m, day] = d.split("-");
-  return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+m-1]} ${+day}`;
-};
-const fmtDateTime = (iso) => {
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " · " +
-    d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-};
+const ROLE_COLOR = { admin:"#a855f7", reviewer:"#4f7df3", cardholder:"#22c55e" };
+const ROLE_LABEL = { admin:"Admin", reviewer:"Reviewer", cardholder:"Cardholder" };
 
-// Generates: RECON-2025-0001, RECON-2025-0002, etc.
-// Counter is stored in module scope so it persists across exports within the session
-let _reconCounter = 1;
-const generateReconId = () => {
-  const year = new Date().getFullYear();
-  const seq = String(_reconCounter++).padStart(4, "0");
-  return `RECON-${year}-${seq}`;
-};
+// ── SMALL UI ──────────────────────────────────────────────────────────────────
+function Av({ name, color="#4f7df3", size=30 }) {
+  const i = name.split(" ").map(p=>p[0]).join("").toUpperCase().slice(0,2);
+  return <div style={{width:size,height:size,borderRadius:"50%",background:color+"28",border:`1px solid ${color}45`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*0.36,fontWeight:600,color,flexShrink:0}}>{i}</div>;
+}
+
+function RoleTag({ role }) {
+  const m={admin:"tag-purple",reviewer:"tag-blue",cardholder:"tag-green"};
+  return <span className={`tag ${m[role]||"tag-gray"}`}>{ROLE_LABEL[role]||role}</span>;
+}
 
 function StatusTag({ status }) {
-  const map = {
-    pending:   ["tag-amber", "● Pending"],
-    submitted: ["tag-blue",  "↑ Submitted"],
-    approved:  ["tag-green", "✓ Approved"],
-    flagged:   ["tag-red",   "⚑ Flagged"],
-    exported:  ["tag-gray",  "→ Exported"],
-  };
-  const [cls, label] = map[status] || ["tag-gray", status];
+  const m={pending:["tag-amber","● Pending"],submitted:["tag-blue","↑ Submitted"],approved:["tag-green","✓ Approved"],flagged:["tag-red","⚑ Flagged"],exported:["tag-gray","→ Exported"]};
+  const [cls,label]=m[status]||["tag-gray",status];
   return <span className={`tag ${cls}`}>{label}</span>;
 }
 
-function ConfidenceDot({ level }) {
-  const colors = { high: "#2d6a4f", medium: "#b8860b", low: "#c84b2f" };
+function StmtTag({ status }) {
+  const m={open:["tag-amber","● Open"],submitted:["tag-blue","↑ Submitted"],approved:["tag-green","✓ Approved"],rejected:["tag-red","✕ Rejected"],exported:["tag-gray","→ Exported"]};
+  const [cls,label]=m[status]||["tag-gray",status];
+  return <span className={`tag ${cls}`}>{label}</span>;
+}
+
+function ConfDot({ level }) {
+  const c={high:"#22c55e",medium:"#f59e0b",low:"#ef4444"};
+  return <span className="tooltip" data-tip={`AI confidence: ${level}`} style={{cursor:"default"}}><span className="conf-dot" style={{background:c[level]||"#aaa"}} /></span>;
+}
+
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
+function LoginPage({ users, onLogin }) {
+  const [email,setEmail]=useState("");
+  const [pw,setPw]=useState("");
+  const [err,setErr]=useState("");
+  const [loading,setLoading]=useState(false);
+
+  const submit = () => {
+    setErr(""); setLoading(true);
+    setTimeout(()=>{
+      const u=users.find(u=>u.email===email&&u.password===pw&&u.active);
+      if(u){onLogin(u);}else{setErr("Invalid email or password.");setLoading(false);}
+    },600);
+  };
+
   return (
-    <span className="match-confidence tooltip" data-tip={`AI confidence: ${level}`}>
-      <span className="conf-dot" style={{ background: colors[level] || "#aaa" }} />
-    </span>
+    <div className="login-bg">
+      <style>{CSS}</style>
+      <div style={{width:"100%",maxWidth:400,position:"relative",zIndex:1}}>
+        <div style={{textAlign:"center",marginBottom:36}}>
+          <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:52,height:52,background:"var(--accent-dim)",border:"1px solid var(--accent-border)",borderRadius:16,marginBottom:16}}>
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5 10C5 7.2 7.2 5 10 5h10" stroke="#4f7df3" strokeWidth="2.2" strokeLinecap="round"/>
+              <path d="M20 5l-3-3M20 5l-3 3" stroke="#4f7df3" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M23 18C23 20.8 20.8 23 18 23H8" stroke="#4f7df3" strokeWidth="2.2" strokeLinecap="round"/>
+              <path d="M8 23l3 3M8 23l3-3" stroke="#4f7df3" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <div style={{fontSize:28,fontWeight:700,color:"var(--text)",letterSpacing:"-0.04em",marginBottom:6}}>Reconcile</div>
+          <div style={{fontSize:13,color:"var(--text3)"}}>Credit card reconciliation · NetSuite integration</div>
+        </div>
+
+        <div className="card" style={{padding:28,boxShadow:"var(--shadow)"}}>
+          <div style={{fontSize:15,fontWeight:600,color:"var(--text)",marginBottom:20}}>Sign in to your account</div>
+          <div style={{display:"flex",flexDirection:"column",gap:14,marginBottom:18}}>
+            <div className="input-group">
+              <label className="input-label">Email address</label>
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@company.com" onKeyDown={e=>e.key==="Enter"&&submit()} />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Password</label>
+              <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="••••••••" onKeyDown={e=>e.key==="Enter"&&submit()} />
+            </div>
+          </div>
+          {err&&<div className="alert-error" style={{marginBottom:14}}>⚠ {err}</div>}
+          <button className="btn-primary" style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={submit} disabled={loading||!email||!pw}>
+            {loading&&<span style={{width:15,height:15,border:"2px solid white",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/>}
+            {loading?"Signing in...":"Sign in →"}
+          </button>
+
+          <div style={{marginTop:20,paddingTop:20,borderTop:"1px solid var(--border)"}}>
+            <div style={{fontSize:10,color:"var(--text3)",fontFamily:"var(--mono)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Quick login — demo accounts</div>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {[{label:"Admin",email:"admin@company.com",pw:"admin123"},{label:"Cardholder",email:"jordan@company.com",pw:"pass123"},{label:"Reviewer",email:"sam@company.com",pw:"pass123"}].map(d=>(
+                <button key={d.email} onClick={()=>{setEmail(d.email);setPw(d.pw);}}
+                  style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,fontSize:12,color:"var(--text2)"}}>
+                  <span style={{color:"var(--text)",fontWeight:600}}>{d.label}</span>
+                  <span style={{fontFamily:"var(--mono)",fontSize:11}}>{d.email}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
-function Avatar({ name, color, size = 28 }) {
-  const initials = name.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2);
+// ── USER MANAGEMENT ───────────────────────────────────────────────────────────
+function UserMgmt({ users, onUpdate }) {
+  const [showAdd,setShowAdd]=useState(false);
+  const [form,setForm]=useState({name:"",email:"",password:"",role:"cardholder",card:""});
+  const [err,setErr]=useState("");
+
+  const add=()=>{
+    if(!form.name||!form.email||!form.password){setErr("Name, email and password are required.");return;}
+    if(users.find(u=>u.email===form.email)){setErr("Email already exists.");return;}
+    onUpdate([...users,{...form,id:"u"+Date.now(),active:true,createdAt:new Date().toISOString().slice(0,10)}]);
+    setForm({name:"",email:"",password:"",role:"cardholder",card:""});setShowAdd(false);setErr("");
+  };
+
   return (
-    <div style={{
-      width: size, height: size, borderRadius: "50%",
-      background: color || "#8a8680",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: size * 0.38, fontWeight: 700, color: "white",
-      fontFamily: "var(--sans)", flexShrink: 0
-    }}>{initials}</div>
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div>
+          <div style={{fontSize:18,fontWeight:700,color:"var(--text)",letterSpacing:"-0.02em"}}>User Management</div>
+          <div style={{fontSize:13,color:"var(--text3)",marginTop:2}}>{users.length} users · {users.filter(u=>u.active).length} active</div>
+        </div>
+        <button className="btn-primary" style={{fontSize:12}} onClick={()=>setShowAdd(true)}>+ Add User</button>
+      </div>
+
+      <div className="card" style={{overflow:"hidden"}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 120px 120px",padding:"10px 16px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em"}}>
+          <span>User</span><span>Email</span><span>Role</span><span>Status</span>
+        </div>
+        {users.map(u=>(
+          <div key={u.id} className="user-row" style={{display:"grid",gridTemplateColumns:"1fr 1fr 120px 120px",opacity:u.active?1:0.45}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <Av name={u.name} color={ROLE_COLOR[u.role]} size={32}/>
+              <div>
+                <div style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{u.name}</div>
+                {u.card&&<div style={{fontSize:11,color:"var(--text3)",fontFamily:"var(--mono)"}}>{u.card}</div>}
+              </div>
+            </div>
+            <div style={{fontSize:12,color:"var(--text2)",fontFamily:"var(--mono)",alignSelf:"center"}}>{u.email}</div>
+            <div style={{alignSelf:"center"}}>
+              <select value={u.role} onChange={e=>onUpdate(users.map(x=>x.id===u.id?{...x,role:e.target.value}:x))} style={{fontSize:12,width:"auto"}}>
+                <option value="cardholder">Cardholder</option>
+                <option value="reviewer">Reviewer</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div style={{alignSelf:"center"}}>
+              <button className={u.active?"btn-danger":"btn-success"} style={{fontSize:11,padding:"5px 12px"}} onClick={()=>onUpdate(users.map(x=>x.id===u.id?{...x,active:!x.active}:x))}>
+                {u.active?"Deactivate":"Activate"}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {showAdd&&(
+        <div className="modal-overlay">
+          <div className="modal-box card" style={{width:"100%",maxWidth:440,padding:28}}>
+            <div style={{fontSize:16,fontWeight:700,color:"var(--text)",marginBottom:20}}>Add New User</div>
+            <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:18}}>
+              {[{l:"Full Name",k:"name",t:"text",p:"Jane Smith"},{l:"Email",k:"email",t:"email",p:"jane@company.com"},{l:"Password",k:"password",t:"password",p:"Temporary password"},{l:"Card (optional)",k:"card",t:"text",p:"Visa ••1234"}].map(f=>(
+                <div key={f.k} className="input-group">
+                  <label className="input-label">{f.l}</label>
+                  <input type={f.t} value={form[f.k]} placeholder={f.p} onChange={e=>setForm(p=>({...p,[f.k]:e.target.value}))}/>
+                </div>
+              ))}
+              <div className="input-group">
+                <label className="input-label">Role</label>
+                <select value={form.role} onChange={e=>setForm(p=>({...p,role:e.target.value}))}>
+                  <option value="cardholder">Cardholder</option>
+                  <option value="reviewer">Reviewer</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+            </div>
+            {err&&<div className="alert-error" style={{marginBottom:14}}>{err}</div>}
+            <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+              <button className="btn-secondary" onClick={()=>{setShowAdd(false);setErr("");}}>Cancel</button>
+              <button className="btn-primary" onClick={add}>Create User</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
-// ─── RECEIPT UPLOAD PANEL ─────────────────────────────────────────────────────
-function ReceiptMatcher({ receipts, transactions, onMatchConfirm, onClose }) {
-  const [matches, setMatches] = useState(() => {
-    // Simulate AI matching
-    const m = {};
-    receipts.forEach((r, i) => {
-      const tx = transactions[i % transactions.length];
-      const conf = ["high","medium","low"][i % 3];
-      m[r.name] = { txId: tx?.id, confidence: conf, suggested: true };
-    });
+// ── GL SETTINGS ───────────────────────────────────────────────────────────────
+function GLSettings({ glAccounts, onSave, onClose }) {
+  const [raw,setRaw]=useState(glAccounts.map(g=>`${g.code}\t${g.name}`).join("\n"));
+  const [parsed,setParsed]=useState(glAccounts);
+  const [err,setErr]=useState("");
+  const parse=(text)=>{
+    setRaw(text);
+    try{const lines=text.trim().split("\n").filter(Boolean).map(l=>{const p=l.split(/[\t,·\-]/).map(s=>s.trim()).filter(Boolean);if(p.length<2)throw new Error(`Bad line: "${l}"`);return{code:p[0],name:p.slice(1).join(" ")};});setParsed(lines);setErr("");}
+    catch(e){setErr(e.message);}
+  };
+  return(
+    <div className="modal-overlay">
+      <div className="modal-box card" style={{width:"100%",maxWidth:520}}>
+        <div style={{padding:"20px 24px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>Chart of Accounts</div>
+          <button className="btn-ghost" onClick={onClose}>✕</button>
+        </div>
+        <div style={{padding:"20px 24px"}}>
+          <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>One GL per line: <span style={{fontFamily:"var(--mono)",color:"var(--text2)"}}>CODE · Name</span></div>
+          <textarea rows={12} value={raw} onChange={e=>parse(e.target.value)} style={{fontFamily:"var(--mono)",fontSize:12,lineHeight:1.8,resize:"vertical"}}/>
+          {err&&<div className="alert-error" style={{marginTop:8}}>⚠ {err}</div>}
+          {!err&&parsed.length>0&&<div style={{fontSize:12,color:"var(--green)",fontFamily:"var(--mono)",marginTop:8}}>✓ {parsed.length} accounts parsed</div>}
+        </div>
+        <div style={{padding:"16px 24px",borderTop:"1px solid var(--border)",display:"flex",gap:10,justifyContent:"flex-end"}}>
+          <button className="btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn-primary" disabled={!!err||!parsed.length} onClick={()=>{onSave(parsed);onClose();}}>Save Accounts</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── RECEIPT MATCHER ───────────────────────────────────────────────────────────
+function ReceiptMatcher({ receipts, transactions, onConfirm, onClose }) {
+  const [matches,setMatches]=useState(()=>{
+    const m={};
+    receipts.forEach((r,i)=>{const tx=transactions[i%transactions.length];m[r.name]={txId:tx?.id,confidence:["high","medium","low"][i%3]};});
     return m;
   });
-
-  return (
+  return(
     <div className="modal-overlay">
-      <div className="modal-box card" style={{ width: "100%", maxWidth: 680, maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--rule)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div className="modal-box card" style={{width:"100%",maxWidth:680,maxHeight:"90vh",overflow:"hidden",display:"flex",flexDirection:"column"}}>
+        <div style={{padding:"20px 24px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div>
-            <div style={{ fontFamily: "var(--sans)", fontWeight: 800, fontSize: 18, color: "var(--ink)" }}>AI Receipt Matching</div>
-            <div style={{ fontSize: 12, color: "var(--ink3)", fontFamily: "var(--mono)", marginTop: 2 }}>{receipts.length} receipts · AI read vendor, amount & date from each file</div>
+            <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>AI Receipt Matching</div>
+            <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{receipts.length} receipts · matched by vendor, amount & date</div>
           </div>
           <button className="btn-ghost" onClick={onClose}>✕</button>
         </div>
-        <div style={{ overflow: "auto", flex: 1, padding: "16px 24px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 8, marginBottom: 12, fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-            <span>Receipt file</span><span></span><span>Matched transaction</span>
-          </div>
-          {receipts.map((r) => {
-            const match = matches[r.name];
-            const tx = transactions.find(t => t.id === match?.txId);
-            return (
-              <div key={r.name} style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 12, alignItems: "center", padding: "12px 0", borderBottom: "1px solid var(--rule)" }}>
-                <div style={{ background: "var(--paper2)", borderRadius: 8, padding: "10px 12px" }}>
-                  <div style={{ fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink)", fontWeight: 500, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>📄 {r.name}</div>
-                  <div style={{ fontSize: 11, color: "var(--ink3)" }}>{(r.size / 1024).toFixed(0)} KB</div>
+        <div style={{overflow:"auto",flex:1,padding:"16px 24px"}}>
+          {receipts.map(r=>{
+            const match=matches[r.name];
+            return(
+              <div key={r.name} style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:12,alignItems:"center",padding:"12px 0",borderBottom:"1px solid var(--border)"}}>
+                <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px"}}>
+                  <div style={{fontSize:12,fontFamily:"var(--mono)",color:"var(--text)",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📄 {r.name}</div>
+                  <div style={{fontSize:11,color:"var(--text3)"}}>{(r.size/1024).toFixed(0)} KB</div>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                  <ConfidenceDot level={match?.confidence} />
-                  <div style={{ fontSize: 9, color: "var(--ink3)", fontFamily: "var(--mono)" }}>AI</div>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                  <ConfDot level={match?.confidence}/>
+                  <div style={{fontSize:9,color:"var(--text3)",fontFamily:"var(--mono)"}}>AI</div>
                 </div>
-                <div>
-                  <select
-                    value={match?.txId || ""}
-                    onChange={e => setMatches(m => ({ ...m, [r.name]: { ...m[r.name], txId: +e.target.value, suggested: false } }))}
-                    style={{ fontSize: 12 }}
-                  >
-                    <option value="">— Unmapped —</option>
-                    {transactions.map(t => (
-                      <option key={t.id} value={t.id}>{fmtDate(t.date)} · {t.vendor} · {fmt(t.amount)}</option>
-                    ))}
-                  </select>
-                </div>
+                <select value={match?.txId||""} onChange={e=>setMatches(m=>({...m,[r.name]:{...m[r.name],txId:+e.target.value}}))}>
+                  <option value="">— Unmapped —</option>
+                  {transactions.map(t=><option key={t.id} value={t.id}>{fmtDate(t.date)} · {t.vendor} · {fmt(t.amount)}</option>)}
+                </select>
               </div>
             );
           })}
         </div>
-        <div style={{ padding: "16px 24px", borderTop: "1px solid var(--rule)", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+        <div style={{padding:"16px 24px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"flex-end",gap:10}}>
           <button className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn-primary" onClick={() => onMatchConfirm(matches)}>Confirm Matches</button>
+          <button className="btn-primary" onClick={()=>onConfirm(matches)}>Confirm Matches</button>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── TRANSACTION DETAIL DRAWER ────────────────────────────────────────────────
-function TxDrawer({ tx, glAccounts, currentUser, onUpdate, onClose }) {
-  const [localTx, setLocalTx] = useState({ ...tx });
-  const fileRef = useRef();
-  const isReviewer = currentUser.role === "Finance Reviewer";
+// ── TRANSACTION DRAWER ────────────────────────────────────────────────────────
+function TxDrawer({ tx, glAccounts, currentUser, onUpdate, onClose, locked }) {
+  const [local,setLocal]=useState({...tx});
+  const fileRef=useRef();
+  const isReviewer=currentUser.role==="reviewer"||currentUser.role==="admin";
+  const canEdit=!locked||(isReviewer&&tx.status==="submitted");
 
-  const save = () => { onUpdate(localTx.id, localTx); onClose(); };
+  const save=()=>{onUpdate(local.id,local);onClose();};
+  const handleFile=(file)=>{if(!file)return;setLocal(t=>({...t,receipt:{name:file.name,size:file.size,url:URL.createObjectURL(file)}}));};
 
-  const handleReceiptFile = (file) => {
-    if (!file) return;
-    setLocalTx(t => ({ ...t, receipt: { name: file.name, size: file.size, url: URL.createObjectURL(file) } }));
-  };
-
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex" }}>
-      <div style={{ flex: 1, background: "rgba(26,24,20,0.4)" }} onClick={onClose} />
-      <div style={{ width: 420, background: "var(--paper)", borderLeft: "1px solid var(--rule)", overflowY: "auto", display: "flex", flexDirection: "column", animation: "slideUp 0.2s ease" }}>
-        {/* Header */}
-        <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--rule)", position: "sticky", top: 0, background: "var(--paper)", zIndex: 2 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-            <StatusTag status={localTx.status} />
-            <button className="btn-ghost" onClick={onClose} style={{ fontSize: 16 }}>✕</button>
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:90,display:"flex"}}>
+      <div style={{flex:1,background:"rgba(0,0,0,0.55)"}} onClick={onClose}/>
+      <div style={{width:420,background:"var(--surface)",borderLeft:"1px solid var(--border)",overflowY:"auto",display:"flex",flexDirection:"column",animation:"slideUp 0.2s ease"}}>
+        <div style={{padding:"20px 24px",borderBottom:"1px solid var(--border)",position:"sticky",top:0,background:"var(--surface)",zIndex:2}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+            <StatusTag status={local.status}/>
+            <button className="btn-ghost" onClick={onClose} style={{fontSize:16,padding:"4px 8px"}}>✕</button>
           </div>
-          <div style={{ fontFamily: "var(--sans)", fontWeight: 800, fontSize: 22, color: "var(--ink)", letterSpacing: "-0.02em" }}>{localTx.vendor}</div>
-          <div style={{ fontFamily: "var(--mono)", fontSize: 28, fontWeight: 500, color: "var(--ink)", marginTop: 4 }}>{fmt(localTx.amount)}</div>
-          <div style={{ fontSize: 12, color: "var(--ink3)", marginTop: 6, fontFamily: "var(--mono)" }}>
-            {fmtDate(localTx.date)} · {localTx.card} · {localTx.cardholder}
-          </div>
+          <div style={{fontSize:18,fontWeight:700,color:"var(--text)",letterSpacing:"-0.02em"}}>{local.vendor}</div>
+          <div style={{fontSize:26,fontWeight:600,color:"var(--text)",marginTop:4,fontFamily:"var(--mono)"}}>{fmt(local.amount)}</div>
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:6,fontFamily:"var(--mono)"}}>{fmtDate(local.date)} · {local.card}</div>
         </div>
 
-        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 20, flex: 1 }}>
-          {/* GL + Dept */}
+        <div style={{padding:"20px 24px",display:"flex",flexDirection:"column",gap:18,flex:1}}>
           <div>
             <span className="sidebar-label">GL Account</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              {localTx.autoAssigned && <span className="tag tag-ai">⚡ AI assigned</span>}
-              {localTx.confidence && <ConfidenceDot level={localTx.confidence} />}
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+              {local.autoAssigned&&<span className="tag tag-ai">⚡ AI assigned</span>}
+              {local.confidence&&<ConfDot level={local.confidence}/>}
             </div>
-            <select value={localTx.gl} onChange={e => {
-              const found = glAccounts.find(g => g.code === e.target.value);
-              setLocalTx(t => ({ ...t, gl: e.target.value, glName: found?.name || "", autoAssigned: false }));
-            }}>
-              {glAccounts.map(g => <option key={g.code} value={g.code}>{g.code} · {g.name}</option>)}
+            <select value={local.gl} disabled={!canEdit} onChange={e=>{const f=glAccounts.find(g=>g.code===e.target.value);setLocal(t=>({...t,gl:e.target.value,glName:f?.name||"",autoAssigned:false}));}}>
+              {glAccounts.map(g=><option key={g.code} value={g.code}>{g.code} · {g.name}</option>)}
             </select>
           </div>
-
           <div>
             <span className="sidebar-label">Department</span>
-            <select value={localTx.dept} onChange={e => setLocalTx(t => ({ ...t, dept: e.target.value }))}>
-              {DEPARTMENTS.map(d => <option key={d}>{d}</option>)}
+            <select value={local.dept} disabled={!canEdit} onChange={e=>setLocal(t=>({...t,dept:e.target.value}))}>
+              {DEPARTMENTS.map(d=><option key={d}>{d}</option>)}
             </select>
           </div>
-
           <div>
-            <span className="sidebar-label">Memo / Notes</span>
-            <textarea
-              rows={3}
-              value={localTx.memo}
-              onChange={e => setLocalTx(t => ({ ...t, memo: e.target.value }))}
-              placeholder="Add a note for the finance team..."
-              style={{ resize: "vertical" }}
-            />
+            <span className="sidebar-label">Memo</span>
+            <textarea rows={3} value={local.memo} disabled={!canEdit} onChange={e=>setLocal(t=>({...t,memo:e.target.value}))} placeholder="Add a note for finance..." style={{resize:"vertical"}}/>
           </div>
 
-          {/* Receipt */}
           <div>
-            <span className="sidebar-label">Receipt</span>
-            {localTx.receipt ? (
-              <div style={{ background: "var(--paper2)", border: "1px solid var(--rule)", borderRadius: 8, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 20 }}>📄</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{localTx.receipt.name}</div>
-                  <div style={{ fontSize: 11, color: "var(--ink3)" }}>{(localTx.receipt.size / 1024).toFixed(0)} KB</div>
+            <span className="sidebar-label">Receipt {!local.receipt&&<span style={{color:"var(--red)"}}>* required</span>}</span>
+            {local.receipt?(
+              <div style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:20}}>📄</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontFamily:"var(--mono)",color:"var(--text)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{local.receipt.name}</div>
+                  <div style={{fontSize:11,color:"var(--text3)"}}>{(local.receipt.size/1024).toFixed(0)} KB</div>
                 </div>
-                {localTx.receiptMatch && <span className="tag tag-ai">⚡ AI matched</span>}
-                <button className="btn-ghost" style={{ color: "var(--accent)" }} onClick={() => setLocalTx(t => ({ ...t, receipt: null }))}>Remove</button>
+                {local.receiptMatch&&<span className="tag tag-ai">⚡ AI</span>}
+                {canEdit&&<button className="btn-ghost" style={{color:"var(--red)",fontSize:11}} onClick={()=>setLocal(t=>({...t,receipt:null}))}>Remove</button>}
               </div>
-            ) : (
-              <div
-                className="drop-zone"
-                style={{ padding: "24px", textAlign: "center" }}
-                onClick={() => fileRef.current.click()}
-                onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add("drag-over"); }}
-                onDragLeave={e => e.currentTarget.classList.remove("drag-over")}
-                onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove("drag-over"); handleReceiptFile(e.dataTransfer.files[0]); }}
-              >
-                <div style={{ fontSize: 24, marginBottom: 8 }}>📎</div>
-                <div style={{ fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink2)" }}>Drop receipt or click to upload</div>
-                <div style={{ fontSize: 11, color: "var(--ink3)", marginTop: 4 }}>PDF, JPG, PNG accepted</div>
+            ):canEdit?(
+              <div className="drop-zone" style={{padding:"24px",textAlign:"center"}} onClick={()=>fileRef.current.click()}
+                onDragOver={e=>{e.preventDefault();e.currentTarget.classList.add("drag-over");}}
+                onDragLeave={e=>e.currentTarget.classList.remove("drag-over")}
+                onDrop={e=>{e.preventDefault();e.currentTarget.classList.remove("drag-over");handleFile(e.dataTransfer.files[0]);}}>
+                <div style={{fontSize:24,marginBottom:8}}>📎</div>
+                <div style={{fontSize:12,color:"var(--text2)"}}>Drop receipt or click to upload</div>
+                <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>PDF, JPG, PNG</div>
               </div>
+            ):(
+              <div style={{fontSize:12,color:"var(--red)",fontFamily:"var(--mono)"}}>No receipt attached</div>
             )}
-            <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: "none" }}
-              onChange={e => handleReceiptFile(e.target.files[0])} />
+            <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
           </div>
 
-          {/* Flag reason (reviewer only) */}
-          {isReviewer && localTx.status === "submitted" && (
+          {isReviewer&&local.status==="submitted"&&(
             <div>
-              <span className="sidebar-label">Flag Reason (optional)</span>
-              <input value={localTx.flagReason} onChange={e => setLocalTx(t => ({ ...t, flagReason: e.target.value }))} placeholder="e.g. Missing receipt, wrong GL..." />
+              <span className="sidebar-label">Flag reason (if rejecting)</span>
+              <input value={local.flagReason} onChange={e=>setLocal(t=>({...t,flagReason:e.target.value}))} placeholder="e.g. Wrong GL, missing memo..."/>
             </div>
           )}
         </div>
 
-        {/* Actions */}
-        <div style={{ padding: "16px 24px", borderTop: "1px solid var(--rule)", display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {!isReviewer && localTx.status === "pending" && (
-            <button className="btn-primary" style={{ flex: 1 }} onClick={() => { setLocalTx(t => ({ ...t, status: "submitted", submittedAt: new Date().toISOString() })); setTimeout(save, 50); }}>
-              Submit for Review
-            </button>
-          )}
-          {isReviewer && localTx.status === "submitted" && (
+        <div style={{padding:"16px 24px",borderTop:"1px solid var(--border)",display:"flex",gap:8,flexWrap:"wrap"}}>
+          {isReviewer&&local.status==="submitted"&&(
             <>
-              <button className="btn-primary" style={{ flex: 1, background: "var(--green)" }} onClick={() => {
-                setLocalTx(t => ({ ...t, status: "approved", reviewedAt: new Date().toISOString(), reviewedBy: currentUser.name }));
-                setTimeout(save, 50);
-              }}>✓ Approve</button>
-              <button className="btn-primary" style={{ flex: 1, background: "var(--accent)" }} onClick={() => {
-                setLocalTx(t => ({ ...t, status: "flagged", reviewedAt: new Date().toISOString(), reviewedBy: currentUser.name }));
-                setTimeout(save, 50);
-              }}>⚑ Flag</button>
+              <button className="btn-success" style={{flex:1}} onClick={()=>{setLocal(t=>({...t,status:"approved"}));setTimeout(save,50);}}>✓ Approve</button>
+              <button className="btn-danger" style={{flex:1}} onClick={()=>{setLocal(t=>({...t,status:"flagged"}));setTimeout(save,50);}}>⚑ Flag</button>
             </>
           )}
-          {localTx.status === "flagged" && !isReviewer && (
-            <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setLocalTx(t => ({ ...t, status: "submitted", flagReason: "" })); setTimeout(save, 50); }}>
-              Resubmit
-            </button>
-          )}
-          <button className="btn-secondary" onClick={save}>Save & Close</button>
+          {canEdit&&<button className="btn-secondary" style={{flex:1}} onClick={save}>Save</button>}
+          {!canEdit&&<button className="btn-secondary" style={{flex:1}} onClick={onClose}>Close</button>}
         </div>
       </div>
     </div>
   );
 }
 
-// ─── NETSUITE EXPORT MODAL ────────────────────────────────────────────────────
-function NetSuiteModal({ transactions, onClose, onExportComplete }) {
-  const [step, setStep] = useState(0); // 0=confirm, 1=loading, 2=success
-  const [reconId] = useState(() => generateReconId());
-  const [exportedAt] = useState(() => new Date().toISOString());
-  const approved = transactions.filter(t => t.status === "approved");
-  const total = approved.reduce((s, t) => s + t.amount, 0);
-  const withReceipts = approved.filter(t => t.receipt).length;
-
-  const handleExport = () => {
-    setStep(1);
-    setTimeout(() => {
-      setStep(2);
-      onExportComplete({
-        reconId,
-        exportedAt,
-        nsId: "EXP-2025-" + String(Math.floor(Math.random() * 9000) + 1000),
-        txCount: approved.length,
-        total,
-        receiptCount: withReceipts,
-        exportedBy: null, // will be filled by parent
-      });
-    }, 2500);
-  };
-
-  return (
+// ── STATEMENT SUBMIT MODAL ────────────────────────────────────────────────────
+function StatementModal({ myTxs, onConfirm, onClose }) {
+  const missing=myTxs.filter(t=>!t.receipt);
+  const ok=missing.length===0;
+  return(
     <div className="modal-overlay">
-      <div className="modal-box card" style={{ width: "100%", maxWidth: 520 }}>
-        <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--rule)", display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ width: 40, height: 40, background: "var(--ink)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ color: "var(--accent2)", fontFamily: "var(--sans)", fontWeight: 900, fontSize: 16 }}>N</span>
-          </div>
-          <div>
-            <div style={{ fontFamily: "var(--sans)", fontWeight: 800, fontSize: 17, color: "var(--ink)" }}>Export to NetSuite</div>
-            <div style={{ fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink3)" }}>Create expense report · Simulated API</div>
-          </div>
+      <div className="modal-box card" style={{width:"100%",maxWidth:500}}>
+        <div style={{padding:"20px 24px",borderBottom:"1px solid var(--border)"}}>
+          <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>Submit Statement for Review</div>
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>{myTxs.length} transactions · March 2025</div>
         </div>
-
-        <div style={{ padding: "24px" }}>
-          {step === 0 && (
+        <div style={{padding:"20px 24px"}}>
+          {!ok?(
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-                {[
-                  ["Report Name", "CC Recon · Mar 2025"],
-                  ["Transactions", `${approved.length} approved lines`],
-                  ["Total Amount", fmt(total)],
-                  ["Receipts", `${withReceipts}/${approved.length} attached`],
-                  ["Subsidiary", "Acme Corp US"],
-                  ["Period", "March 2025"],
-                ].map(([k, v]) => (
-                  <div key={k} style={{ background: "var(--paper2)", borderRadius: 8, padding: "10px 14px" }}>
-                    <div style={{ fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>{k}</div>
-                    <div style={{ fontSize: 13, fontFamily: "var(--mono)", color: "var(--ink)", fontWeight: 500 }}>{v}</div>
+              <div className="alert-error" style={{marginBottom:16}}>⚠ {missing.length} transaction{missing.length>1?"s are":" is"} missing a receipt. All receipts must be attached before submitting.</div>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {missing.map(t=>(
+                  <div key={t.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:"var(--surface2)",borderRadius:8,fontSize:12,border:"1px solid var(--red-border)"}}>
+                    <span style={{color:"var(--text)"}}>{t.vendor}</span>
+                    <span style={{fontFamily:"var(--mono)",color:"var(--text2)"}}>{fmt(t.amount)}</span>
                   </div>
                 ))}
               </div>
-              <div style={{ fontSize: 11, color: "var(--ink3)", fontFamily: "var(--mono)", background: "var(--paper2)", borderRadius: 8, padding: "10px 14px", marginBottom: 16 }}>
-                📎 All receipts will be compiled into a single PDF and attached to the expense report in NetSuite.
-              </div>
-              <div style={{ maxHeight: 200, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
-                {approved.map(t => (
-                  <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", background: "var(--paper2)", borderRadius: 6, fontSize: 12, fontFamily: "var(--mono)" }}>
-                    <div style={{ color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "50%" }}>{t.vendor}</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ color: "var(--ink3)" }}>{t.gl} · {t.dept}</span>
-                      <span style={{ color: "var(--ink)", fontWeight: 600 }}>{fmt(t.amount)}</span>
-                      {t.receipt ? <span title="Receipt attached">📎</span> : <span title="No receipt" style={{ opacity: 0.3 }}>📎</span>}
+            </>
+          ):(
+            <>
+              <div className="alert-success" style={{marginBottom:16}}>✓ All {myTxs.length} transactions have receipts attached. Ready to submit.</div>
+              <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:220,overflowY:"auto"}}>
+                {myTxs.map(t=>(
+                  <div key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"var(--surface2)",borderRadius:8,fontSize:12}}>
+                    <div><span style={{color:"var(--text)",fontWeight:500}}>{t.vendor}</span><span style={{color:"var(--text3)",marginLeft:8}}>{fmtDate(t.date)}</span></div>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{color:"var(--green)",fontSize:11}}>📎</span>
+                      <span style={{fontFamily:"var(--mono)",color:"var(--text)"}}>{fmt(t.amount)}</span>
                     </div>
                   </div>
                 ))}
               </div>
             </>
           )}
+        </div>
+        <div style={{padding:"16px 24px",borderTop:"1px solid var(--border)",display:"flex",gap:10,justifyContent:"flex-end"}}>
+          <button className="btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn-primary" disabled={!ok} onClick={onConfirm}>Submit Statement →</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-          {step === 1 && (
-            <div style={{ textAlign: "center", padding: "40px 0" }}>
-              <div style={{ width: 48, height: 48, border: "3px solid var(--rule)", borderTopColor: "var(--ink)", borderRadius: "50%", margin: "0 auto 16px", animation: "spin 0.8s linear infinite" }} />
-              <div style={{ fontFamily: "var(--sans)", fontWeight: 700, fontSize: 16, color: "var(--ink)" }}>Connecting to NetSuite...</div>
-              <div style={{ fontSize: 12, color: "var(--ink3)", fontFamily: "var(--mono)", marginTop: 6 }}>Compiling receipts PDF · Posting expense lines via REST API</div>
+// ── NETSUITE MODAL ────────────────────────────────────────────────────────────
+function NSModal({ transactions, onClose, onDone }) {
+  const [step,setStep]=useState(0);
+  const [reconId]=useState(genReconId);
+  const [ts]=useState(()=>new Date().toISOString());
+  const approved=transactions.filter(t=>t.status==="approved");
+  const total=approved.reduce((s,t)=>s+t.amount,0);
+  const wReceipts=approved.filter(t=>t.receipt).length;
+
+  const go=()=>{setStep(1);setTimeout(()=>{setStep(2);onDone({reconId,exportedAt:ts,nsId:"EXP-"+reconId.split("-")[2],txCount:approved.length,total,receiptCount:wReceipts});},2500);};
+
+  return(
+    <div className="modal-overlay">
+      <div className="modal-box card" style={{width:"100%",maxWidth:520}}>
+        <div style={{padding:"20px 24px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:14}}>
+          <div style={{width:40,height:40,background:"var(--surface2)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid var(--border)"}}>
+            <span style={{fontWeight:900,fontSize:16,color:"var(--accent)"}}>N</span>
+          </div>
+          <div>
+            <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>Export to NetSuite</div>
+            <div style={{fontSize:12,color:"var(--text3)"}}>Create expense report · Simulated API</div>
+          </div>
+        </div>
+        <div style={{padding:24}}>
+          {step===0&&(
+            <>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+                {[["Report","CC Recon · Mar 2025"],["Transactions",`${approved.length} lines`],["Total",fmt(total)],["Receipts",`${wReceipts}/${approved.length}`],["Subsidiary","Acme Corp US"],["Period","March 2025"]].map(([k,v])=>(
+                  <div key={k} style={{background:"var(--surface2)",borderRadius:8,padding:"10px 14px"}}>
+                    <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>{k}</div>
+                    <div style={{fontSize:13,fontFamily:"var(--mono)",color:"var(--text)",fontWeight:500}}>{v}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{fontSize:11,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--surface2)",borderRadius:8,padding:"10px 14px",marginBottom:14}}>📎 All receipts compiled into a single PDF attached to the report.</div>
+              <div style={{maxHeight:180,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
+                {approved.map(t=>(
+                  <div key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:"var(--surface2)",borderRadius:6,fontSize:12,fontFamily:"var(--mono)"}}>
+                    <span style={{color:"var(--text)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"50%"}}>{t.vendor}</span>
+                    <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                      <span style={{color:"var(--text3)"}}>{t.gl}</span>
+                      <span style={{color:"var(--text)",fontWeight:600}}>{fmt(t.amount)}</span>
+                      <span style={{opacity:t.receipt?1:0.2}}>📎</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {step===1&&(
+            <div style={{textAlign:"center",padding:"44px 0"}}>
+              <div style={{width:44,height:44,border:"3px solid var(--border2)",borderTopColor:"var(--accent)",borderRadius:"50%",margin:"0 auto 16px",animation:"spin 0.8s linear infinite"}}/>
+              <div style={{fontSize:15,fontWeight:600,color:"var(--text)"}}>Connecting to NetSuite...</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>Compiling receipts PDF · Posting via REST API</div>
             </div>
           )}
-
-          {step === 2 && (
-            <div style={{ textAlign: "center", padding: "24px 0 16px" }}>
-              <div style={{ width: 56, height: 56, background: "#d4edda", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, margin: "0 auto 16px" }}>✓</div>
-              <div style={{ fontFamily: "var(--sans)", fontWeight: 800, fontSize: 18, color: "var(--ink)", marginBottom: 6 }}>Expense Report Created</div>
-              <div style={{ fontSize: 12, color: "var(--ink3)", fontFamily: "var(--mono)", marginBottom: 20 }}>Submitted · Pending approval in NetSuite</div>
-
-              {/* Internal ID — highlighted */}
-              <div style={{ background: "var(--ink)", borderRadius: 10, padding: "14px 18px", marginBottom: 14, textAlign: "left" }}>
-                <div style={{ fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink3)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Internal Reconciliation ID</div>
-                <div style={{ fontFamily: "var(--mono)", fontSize: 22, fontWeight: 600, color: "var(--accent2)", letterSpacing: "0.04em" }}>{reconId}</div>
-                <div style={{ fontSize: 10, color: "var(--ink3)", fontFamily: "var(--mono)", marginTop: 4 }}>Use this ID to reference this batch in any system</div>
+          {step===2&&(
+            <div style={{textAlign:"center",padding:"20px 0 10px"}}>
+              <div style={{width:52,height:52,background:"var(--green-dim)",border:"1px solid var(--green-border)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,margin:"0 auto 16px"}}>✓</div>
+              <div style={{fontSize:17,fontWeight:700,color:"var(--text)",marginBottom:4}}>Expense Report Created</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:20}}>Pending approval in NetSuite</div>
+              <div style={{background:"var(--surface2)",borderRadius:12,padding:"14px 18px",marginBottom:14,textAlign:"left",border:"1px solid var(--accent-border)"}}>
+                <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:6}}>Internal Reconciliation ID</div>
+                <div style={{fontFamily:"var(--mono)",fontSize:20,fontWeight:600,color:"var(--accent)"}}>{reconId}</div>
               </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, textAlign: "left" }}>
-                {[
-                  ["NetSuite ID", "EXP-2025-" + reconId.split("-")[2]],
-                  ["Status", "Pending Approval"],
-                  ["Lines created", approved.length],
-                  ["Receipts PDF", "1 file attached"],
-                  ["Exported at", fmtDateTime(exportedAt)],
-                  ["Period", "March 2025"],
-                ].map(([k, v]) => (
-                  <div key={k} style={{ background: "var(--paper2)", borderRadius: 8, padding: "10px 14px" }}>
-                    <div style={{ fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>{k}</div>
-                    <div style={{ fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink)", fontWeight: 500 }}>{v}</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,textAlign:"left"}}>
+                {[["NetSuite ID","EXP-"+reconId.split("-")[2]],["Status","Pending Approval"],["Lines",approved.length],["Receipts PDF","1 file attached"],["Exported at",fmtDateTime(ts)],["Period","March 2025"]].map(([k,v])=>(
+                  <div key={k} style={{background:"var(--surface2)",borderRadius:8,padding:"10px 14px"}}>
+                    <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>{k}</div>
+                    <div style={{fontSize:12,fontFamily:"var(--mono)",color:"var(--text)",fontWeight:500}}>{v}</div>
                   </div>
                 ))}
               </div>
             </div>
           )}
         </div>
-
-        <div style={{ padding: "16px 24px", borderTop: "1px solid var(--rule)", display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          {step === 0 && <><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" onClick={handleExport}>Create Expense Report →</button></>}
-          {step === 2 && <button className="btn-primary" onClick={onClose}>Done</button>}
+        <div style={{padding:"16px 24px",borderTop:"1px solid var(--border)",display:"flex",gap:10,justifyContent:"flex-end"}}>
+          {step===0&&<><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" onClick={go}>Create Expense Report →</button></>}
+          {step===2&&<button className="btn-primary" onClick={onClose}>Done</button>}
         </div>
       </div>
     </div>
   );
 }
 
-// ─── GL SETTINGS PANEL ───────────────────────────────────────────────────────
-function GLSettings({ glAccounts, onSave, onClose }) {
-  const [rawText, setRawText] = useState(glAccounts.map(g => `${g.code}\t${g.name}`).join("\n"));
-  const [parsed, setParsed] = useState(glAccounts);
-  const [error, setError] = useState("");
-
-  const handleParse = (text) => {
-    setRawText(text);
-    try {
-      const lines = text.trim().split("\n").filter(Boolean).map(line => {
-        const parts = line.split(/[\t,·\-]/).map(s => s.trim()).filter(Boolean);
-        if (parts.length < 2) throw new Error(`Bad line: "${line}"`);
-        return { code: parts[0], name: parts.slice(1).join(" ") };
-      });
-      setParsed(lines);
-      setError("");
-    } catch (e) { setError(e.message); }
-  };
-
-  return (
-    <div className="modal-overlay">
-      <div className="modal-box card" style={{ width: "100%", maxWidth: 560 }}>
-        <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--rule)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontFamily: "var(--sans)", fontWeight: 800, fontSize: 17, color: "var(--ink)" }}>Chart of Accounts</div>
-            <div style={{ fontSize: 12, color: "var(--ink3)", fontFamily: "var(--mono)", marginTop: 2 }}>Paste your GL codes — one per line: CODE · Name</div>
-          </div>
-          <button className="btn-ghost" onClick={onClose}>✕</button>
-        </div>
-        <div style={{ padding: "20px 24px" }}>
-          <textarea
-            rows={12}
-            value={rawText}
-            onChange={e => handleParse(e.target.value)}
-            placeholder={"6020\tOffice Supplies\n6100\tCloud Infrastructure\n6110\tSoftware & SaaS\n..."}
-            style={{ fontFamily: "var(--mono)", fontSize: 12, lineHeight: 1.7, resize: "vertical" }}
-          />
-          {error && <div style={{ fontSize: 12, color: "var(--accent)", fontFamily: "var(--mono)", marginTop: 8 }}>⚠ {error}</div>}
-          {!error && parsed.length > 0 && (
-            <div style={{ fontSize: 12, color: "var(--green)", fontFamily: "var(--mono)", marginTop: 8 }}>✓ {parsed.length} accounts parsed</div>
-          )}
-        </div>
-        <div style={{ padding: "16px 24px", borderTop: "1px solid var(--rule)", display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn-primary" disabled={!!error || !parsed.length} onClick={() => { onSave(parsed); onClose(); }}>Save Accounts</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+// ── MAIN ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [transactions, setTransactions] = useState(initTx);
-  const [glAccounts, setGlAccounts] = useState(DEFAULT_GL_ACCOUNTS);
-  const [activeTab, setActiveTab] = useState("transactions");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [filterCardholder, setFilterCardholder] = useState("All cardholders");
-  const [search, setSearch] = useState("");
-  const [selectedTxId, setSelectedTxId] = useState(null);
-  const [showReceipts, setShowReceipts] = useState(false);
-  const [showNS, setShowNS] = useState(false);
-  const [showGLSettings, setShowGLSettings] = useState(false);
-  const [uploadedReceipts, setUploadedReceipts] = useState([]);
-  const [showReceiptMatcher, setShowReceiptMatcher] = useState(false);
-  const [csvError, setCsvError] = useState("");
-  const [exportHistory, setExportHistory] = useState([]);
-  const csvRef = useRef();
-  const receiptFolderRef = useRef();
+  const [users,setUsers]=useState(INITIAL_USERS);
+  const [currentUser,setCurrentUser]=useState(null);
+  const [transactions,setTransactions]=useState(initTx);
+  const [glAccounts,setGlAccounts]=useState(DEFAULT_GL_ACCOUNTS);
+  const [activeTab,setActiveTab]=useState("transactions");
+  const [filterStatus,setFilterStatus]=useState("all");
+  const [filterUser,setFilterUser]=useState("all");
+  const [search,setSearch]=useState("");
+  const [selectedTxId,setSelectedTxId]=useState(null);
+  const [showNS,setShowNS]=useState(false);
+  const [showGL,setShowGL]=useState(false);
+  const [showStmt,setShowStmt]=useState(false);
+  const [uploadedReceipts,setUploadedReceipts]=useState([]);
+  const [showMatcher,setShowMatcher]=useState(false);
+  const [exportHistory,setExportHistory]=useState([]);
+  const [stmtStatus,setStmtStatus]=useState({});
+  const [csvErr,setCsvErr]=useState("");
+  const csvRef=useRef();
+  const rcptRef=useRef();
 
-  const update = useCallback((id, changes) => {
-    setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t));
-  }, []);
+  const isAdmin=currentUser?.role==="admin";
+  const isReviewer=currentUser?.role==="reviewer"||currentUser?.role==="admin";
+  const isCardholder=currentUser?.role==="cardholder";
 
-  const handleCSV = (file) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const lines = e.target.result.split("\n").filter(Boolean);
-        const headers = lines[0].toLowerCase().split(",").map(h => h.trim().replace(/"/g, ""));
-        const rows = lines.slice(1).map((line, i) => {
-          const vals = line.split(",").map(v => v.trim().replace(/"/g, ""));
-          const obj = {};
-          headers.forEach((h, j) => obj[h] = vals[j] || "");
-          const vendor = obj.vendor || obj.merchant || obj.description || "Unknown";
-          const amount = parseFloat((obj.amount || obj.debit || "0").replace(/[$,]/g, "")) || 0;
-          const date = obj.date || obj["transaction date"] || new Date().toISOString().slice(0, 10);
-          const assigned = autoAssign(vendor);
-          return {
-            id: Date.now() + i,
-            date, vendor,
-            description: obj.description || obj.memo || "",
-            amount, card: obj.card || obj["card number"] || "Unknown",
-            cardholder: currentUser?.name || "Unknown",
-            ...assigned,
-            status: "pending", receipt: null, receiptMatch: null, memo: "", flagReason: "",
-          };
+  const update=useCallback((id,changes)=>setTransactions(prev=>prev.map(t=>t.id===id?{...t,...changes}:t)),[]);
+  const myTxs=transactions.filter(t=>t.userId===currentUser?.id);
+  const myStmt=stmtStatus[currentUser?.id]||"open";
+  const stmtLocked=["submitted","approved","exported"].includes(myStmt);
+
+  const submitStmt=()=>{
+    setTransactions(prev=>prev.map(t=>t.userId===currentUser.id&&t.status==="pending"?{...t,status:"submitted"}:t));
+    setStmtStatus(s=>({...s,[currentUser.id]:"submitted"}));
+    setShowStmt(false);
+  };
+
+  const handleCSV=(file)=>{
+    if(!file)return;
+    const r=new FileReader();
+    r.onload=e=>{
+      try{
+        const lines=e.target.result.split("\n").filter(Boolean);
+        const headers=lines[0].toLowerCase().split(",").map(h=>h.trim().replace(/"/g,""));
+        const rows=lines.slice(1).map((line,i)=>{
+          const vals=line.split(",").map(v=>v.trim().replace(/"/g,""));
+          const obj={};headers.forEach((h,j)=>obj[h]=vals[j]||"");
+          const vendor=obj.vendor||obj.merchant||obj.description||"Unknown";
+          const amount=parseFloat((obj.amount||obj.debit||"0").replace(/[$,]/g,""))||0;
+          const date=obj.date||new Date().toISOString().slice(0,10);
+          return{id:Date.now()+i,date,vendor,description:obj.description||"",amount,card:obj.card||"Unknown",userId:currentUser.id,...autoAssign(vendor),status:"pending",receipt:null,receiptMatch:null,memo:"",flagReason:"",reconId:null};
         });
-        setTransactions(prev => [...prev, ...rows]);
-        setCsvError("");
-      } catch (err) { setCsvError("Could not parse CSV. Ensure columns: Date, Vendor, Amount, Card"); }
+        setTransactions(prev=>[...prev,...rows]);setCsvErr("");
+      }catch{setCsvErr("Could not parse CSV. Ensure columns: Date, Vendor, Amount.");}
     };
-    reader.readAsText(file);
+    r.readAsText(file);
   };
 
-  const handleReceiptFolder = (files) => {
-    const arr = Array.from(files).map(f => ({ name: f.name, size: f.size, file: f, url: URL.createObjectURL(f) }));
-    setUploadedReceipts(arr);
-    setShowReceiptMatcher(true);
+  const handleRcptFolder=(files)=>{
+    const arr=Array.from(files).map(f=>({name:f.name,size:f.size,url:URL.createObjectURL(f)}));
+    setUploadedReceipts(arr);setShowMatcher(true);
   };
 
-  const handleMatchConfirm = (matches) => {
-    setTransactions(prev => prev.map(t => {
-      const match = Object.entries(matches).find(([, v]) => v.txId === t.id);
-      if (!match) return t;
-      const r = uploadedReceipts.find(r => r.name === match[0]);
-      return r ? { ...t, receipt: { name: r.name, size: r.size, url: r.url }, receiptMatch: match[1].confidence } : t;
+  const handleMatchConfirm=(matches)=>{
+    setTransactions(prev=>prev.map(t=>{
+      const match=Object.entries(matches).find(([,v])=>v.txId===t.id);
+      if(!match)return t;
+      const r=uploadedReceipts.find(r=>r.name===match[0]);
+      return r?{...t,receipt:{name:r.name,size:r.size,url:r.url},receiptMatch:match[1].confidence}:t;
     }));
-    setShowReceiptMatcher(false);
+    setShowMatcher(false);
   };
 
-  const handleExportComplete = (record) => {
-    const fullRecord = { ...record, exportedBy: currentUser.name };
-    setExportHistory(prev => [fullRecord, ...prev]);
-    // Stamp all approved transactions with the reconciliation ID
-    setTransactions(prev => prev.map(t =>
-      t.status === "approved" ? { ...t, status: "exported", reconId: fullRecord.reconId } : t
-    ));
+  const handleExportDone=(record)=>{
+    const full={...record,exportedBy:currentUser.name};
+    setExportHistory(prev=>[full,...prev]);
+    setTransactions(prev=>prev.map(t=>t.status==="approved"?{...t,status:"exported",reconId:full.reconId}:t));
   };
 
-  const filtered = transactions.filter(t => {
-    if (filterStatus !== "all" && t.status !== filterStatus) return false;
-    if (filterCardholder !== "All cardholders" && t.cardholder !== filterCardholder) return false;
-    if (search && !t.vendor.toLowerCase().includes(search.toLowerCase()) && !t.description.toLowerCase().includes(search.toLowerCase())) return false;
-    // Cardholder only sees own transactions
-    if (currentUser?.role === "Cardholder" && t.cardholder !== currentUser.name) return false;
+  const vis=transactions.filter(t=>{
+    if(isCardholder&&t.userId!==currentUser.id)return false;
+    if(filterStatus!=="all"&&t.status!==filterStatus)return false;
+    if(filterUser!=="all"&&t.userId!==filterUser)return false;
+    if(search&&!t.vendor.toLowerCase().includes(search.toLowerCase())&&!t.description.toLowerCase().includes(search.toLowerCase()))return false;
     return true;
   });
 
-  const counts = {
-    all: transactions.filter(t => currentUser?.role !== "Cardholder" || t.cardholder === currentUser?.name).length,
-    pending: transactions.filter(t => t.status === "pending" && (currentUser?.role !== "Cardholder" || t.cardholder === currentUser?.name)).length,
-    submitted: transactions.filter(t => t.status === "submitted").length,
-    approved: transactions.filter(t => t.status === "approved").length,
-    flagged: transactions.filter(t => t.status === "flagged" && (currentUser?.role !== "Cardholder" || t.cardholder === currentUser?.name)).length,
-    exported: transactions.filter(t => t.status === "exported").length,
+  const counts={
+    all:isCardholder?myTxs.length:transactions.length,
+    pending:transactions.filter(t=>t.status==="pending"&&(isCardholder?t.userId===currentUser?.id:true)).length,
+    submitted:transactions.filter(t=>t.status==="submitted").length,
+    approved:transactions.filter(t=>t.status==="approved").length,
+    flagged:transactions.filter(t=>t.status==="flagged"&&(isCardholder?t.userId===currentUser?.id:true)).length,
+    exported:transactions.filter(t=>t.status==="exported").length,
   };
 
-  const totalApproved = transactions.filter(t => t.status === "approved").reduce((s, t) => s + t.amount, 0);
-  const totalSubmitted = transactions.filter(t => t.status === "submitted").reduce((s, t) => s + t.amount, 0);
-  const isReviewer = currentUser?.role === "Finance Reviewer";
+  const approvedAmt=transactions.filter(t=>t.status==="approved").reduce((s,t)=>s+t.amount,0);
+  const totalAmt=vis.reduce((s,t)=>s+t.amount,0);
+  const selectedTx=transactions.find(t=>t.id===selectedTxId);
 
-  // ─── USER SELECTOR ──────────────────────────────────────────────────────────
-  if (!currentUser) {
-    return (
-      <div style={{ minHeight: "100vh", background: "var(--paper)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-        <style>{CSS}</style>
-        <div style={{ width: "100%", maxWidth: 440 }}>
-          <div style={{ textAlign: "center", marginBottom: 40 }}>
-            <div style={{ fontFamily: "var(--sans)", fontWeight: 900, fontSize: 32, color: "var(--ink)", letterSpacing: "-0.04em", marginBottom: 8 }}>
-              Reconcile<span style={{ color: "var(--accent)" }}>.</span>
-            </div>
-            <div style={{ fontFamily: "var(--mono)", fontSize: 13, color: "var(--ink3)" }}>Credit card reconciliation · NetSuite integration</div>
-          </div>
-          <div className="card" style={{ padding: 28 }}>
-            <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--ink3)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 16 }}>Who are you?</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {ROLES.map(r => (
-                <button key={r.name} onClick={() => setCurrentUser(r)}
-                  style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", background: "var(--paper2)", border: "1px solid var(--rule)", borderRadius: 10, textAlign: "left", transition: "all 0.15s" }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--ink2)"; e.currentTarget.style.background = "var(--paper3)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--rule)"; e.currentTarget.style.background = "var(--paper2)"; }}>
-                  <Avatar name={r.name} color={r.color} size={40} />
-                  <div>
-                    <div style={{ fontFamily: "var(--sans)", fontWeight: 700, fontSize: 15, color: "var(--ink)" }}>{r.name}</div>
-                    <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--ink3)" }}>{r.role}{r.card ? ` · ${r.card}` : ""}</div>
-                  </div>
-                  <div style={{ marginLeft: "auto", fontSize: 16, color: "var(--ink3)" }}>→</div>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div style={{ textAlign: "center", marginTop: 16, fontSize: 11, color: "var(--ink3)", fontFamily: "var(--mono)" }}>
-            No login required · Shared workspace
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if(!currentUser)return <LoginPage users={users} onLogin={setCurrentUser}/>;
 
-  const selectedTx = transactions.find(t => t.id === selectedTxId);
+  const tabs=isCardholder?["transactions","receipts"]:isAdmin?["transactions","receipts","users","settings"]:["transactions","receipts","settings"];
+  const tabLabel={transactions:"Transactions",receipts:`Receipts${uploadedReceipts.length>0?` (${uploadedReceipts.length})`:""}`,users:"Users",settings:"Settings"};
 
-  return (
-    <div style={{ minHeight: "100vh", background: "var(--paper)", fontFamily: "var(--mono)" }}>
+  return(
+    <div style={{minHeight:"100vh",background:"var(--bg)"}}>
       <style>{CSS}</style>
 
-      {/* ── TOP NAV ── */}
-      <div style={{ background: "var(--paper)", borderBottom: "1px solid var(--rule)", position: "sticky", top: 0, zIndex: 50 }}>
-        <div style={{ maxWidth: 1300, margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", gap: 0 }}>
-          {/* Logo */}
-          <div style={{ fontFamily: "var(--sans)", fontWeight: 900, fontSize: 18, color: "var(--ink)", letterSpacing: "-0.04em", paddingRight: 28, borderRight: "1px solid var(--rule)", marginRight: 4 }}>
-            Reconcile<span style={{ color: "var(--accent)" }}>.</span>
+      {/* NAV */}
+      <div style={{background:"var(--surface)",borderBottom:"1px solid var(--border)",position:"sticky",top:0,zIndex:50}}>
+        <div style={{maxWidth:1340,margin:"0 auto",padding:"0 24px",display:"flex",alignItems:"center"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,paddingRight:24,borderRight:"1px solid var(--border)",marginRight:4,height:56,flexShrink:0}}>
+            <div style={{width:28,height:28,background:"var(--accent-dim)",border:"1px solid var(--accent-border)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M5 10C5 7.2 7.2 5 10 5h10" stroke="#4f7df3" strokeWidth="2.6" strokeLinecap="round"/>
+                <path d="M20 5l-3-3M20 5l-3 3" stroke="#4f7df3" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M23 18C23 20.8 20.8 23 18 23H8" stroke="#4f7df3" strokeWidth="2.6" strokeLinecap="round"/>
+                <path d="M8 23l3 3M8 23l3-3" stroke="#4f7df3" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <span style={{fontSize:15,fontWeight:700,color:"var(--text)",letterSpacing:"-0.02em"}}>Reconcile</span>
           </div>
-          {/* Tabs */}
-          <div style={{ display: "flex", flex: 1, overflowX: "auto" }}>
-            {["transactions", "receipts", "settings"].map(tab => (
-              <button key={tab} className={`nav-tab ${activeTab === tab ? "active" : ""}`} onClick={() => setActiveTab(tab)}>
-                {tab === "transactions" && "Transactions"}
-                {tab === "receipts" && `Receipts ${uploadedReceipts.length > 0 ? `(${uploadedReceipts.length})` : ""}`}
-                {tab === "settings" && `Settings ${exportHistory.length > 0 ? `· ${exportHistory.length} export${exportHistory.length > 1 ? "s" : ""}` : ""}`}
-              </button>
-            ))}
+          <div style={{display:"flex",flex:1,overflowX:"auto"}}>
+            {tabs.map(t=><button key={t} className={`nav-tab ${activeTab===t?"active":""}`} onClick={()=>setActiveTab(t)}>{tabLabel[t]}</button>)}
           </div>
-          {/* Right: user + export */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, paddingLeft: 16 }}>
-            {isReviewer && counts.approved > 0 && (
-              <button className="btn-primary" style={{ fontSize: 12, padding: "7px 14px", background: "var(--ink)" }} onClick={() => setShowNS(true)}>
-                Export to NetSuite →
-              </button>
-            )}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "var(--paper2)", borderRadius: 8, border: "1px solid var(--rule)", cursor: "pointer" }}
-              onClick={() => setCurrentUser(null)}>
-              <Avatar name={currentUser.name} color={ROLES.find(r => r.name === currentUser.name)?.color} size={24} />
-              <div style={{ fontSize: 11 }}>
-                <div style={{ color: "var(--ink)", fontWeight: 500 }}>{currentUser.name}</div>
-                <div style={{ color: "var(--ink3)", fontSize: 10 }}>{currentUser.role}</div>
+          <div style={{display:"flex",alignItems:"center",gap:10,paddingLeft:16,flexShrink:0}}>
+            {isCardholder&&(
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <StmtTag status={myStmt}/>
+                {myStmt==="open"&&<button className="btn-primary" style={{fontSize:12,padding:"7px 14px"}} onClick={()=>setShowStmt(true)}>Submit Statement →</button>}
               </div>
-              <span style={{ color: "var(--ink3)", fontSize: 10, marginLeft: 4 }}>↩</span>
+            )}
+            {isReviewer&&counts.approved>0&&(
+              <button className="btn-primary" style={{fontSize:12,padding:"7px 14px"}} onClick={()=>setShowNS(true)}>Export to NetSuite →</button>
+            )}
+            <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 12px",background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)",cursor:"pointer"}} onClick={()=>setCurrentUser(null)}>
+              <Av name={currentUser.name} color={ROLE_COLOR[currentUser.role]} size={22}/>
+              <div>
+                <div style={{fontSize:12,fontWeight:600,color:"var(--text)",lineHeight:1.2}}>{currentUser.name}</div>
+                <div style={{fontSize:10,color:"var(--text3)",lineHeight:1.2}}>{ROLE_LABEL[currentUser.role]}</div>
+              </div>
+              <span style={{fontSize:10,color:"var(--text3)",marginLeft:2}}>↩</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div style={{ maxWidth: 1300, margin: "0 auto", padding: "28px 24px" }}>
+      <div style={{maxWidth:1340,margin:"0 auto",padding:"28px 24px"}}>
 
-        {/* ── TRANSACTIONS TAB ── */}
-        {activeTab === "transactions" && (
+        {/* TRANSACTIONS */}
+        {activeTab==="transactions"&&(
           <>
-            {/* Stats row */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
-              {[
-                { label: "Total", value: fmt(transactions.reduce((s,t) => s+t.amount, 0)), sub: `${transactions.length} transactions`, color: "var(--ink)" },
-                { label: "Pending", value: fmt(transactions.filter(t=>t.status==="pending").reduce((s,t)=>s+t.amount,0)), sub: `${counts.pending} to submit`, color: "#b8860b" },
-                { label: "In Review", value: fmt(totalSubmitted), sub: `${counts.submitted} submitted`, color: "var(--blue)" },
-                { label: "Approved", value: fmt(totalApproved), sub: `${counts.approved} lines`, color: "var(--green)" },
-                { label: "No Receipt", value: transactions.filter(t=>!t.receipt).length, sub: "missing", color: "var(--accent)" },
-              ].map(s => (
-                <div key={s.label} className="card" style={{ padding: "16px 18px" }}>
-                  <div style={{ fontSize: 10, color: "var(--ink3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{s.label}</div>
-                  <div style={{ fontFamily: "var(--sans)", fontSize: 22, fontWeight: 800, color: s.color, letterSpacing: "-0.03em" }}>{s.value}</div>
-                  <div style={{ fontSize: 11, color: "var(--ink3)", marginTop: 2 }}>{s.sub}</div>
+            {isCardholder&&myStmt==="submitted"&&<div className="alert-warning" style={{marginBottom:20,fontSize:13}}>⟳ Your statement is submitted and pending review by the finance team.</div>}
+            {isCardholder&&myStmt==="approved"&&<div className="alert-success" style={{marginBottom:20,fontSize:13}}>✓ Your statement has been approved and submitted to NetSuite.</div>}
+            {isCardholder&&myStmt==="open"&&myTxs.filter(t=>!t.receipt).length>0&&(
+              <div className="alert-error" style={{marginBottom:20,fontSize:13}}>⚠ {myTxs.filter(t=>!t.receipt).length} transaction{myTxs.filter(t=>!t.receipt).length>1?"s are":" is"} missing a receipt. Attach all before submitting.</div>
+            )}
+
+            {/* Stats */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(148px,1fr))",gap:12,marginBottom:24}}>
+              {[{l:"Total",v:fmt(totalAmt),s:`${vis.length} transactions`},{l:"Pending",v:counts.pending,s:"to review",c:"var(--amber)"},{l:"In Review",v:counts.submitted,s:"submitted",c:"var(--accent)"},{l:"Approved",v:fmt(approvedAmt),s:`${counts.approved} lines`,c:"var(--green)"},{l:"Flagged",v:counts.flagged,s:"need attention",c:"var(--red)"}].map(s=>(
+                <div key={s.l} className="stat-card">
+                  <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>{s.l}</div>
+                  <div style={{fontSize:22,fontWeight:700,color:s.c||"var(--text)",letterSpacing:"-0.03em"}}>{s.v}</div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>{s.s}</div>
                 </div>
               ))}
             </div>
 
             {/* Progress */}
-            <div className="card" style={{ padding: "14px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--ink3)", marginBottom: 6 }}>
+            <div className="card" style={{padding:"14px 18px",marginBottom:20,display:"flex",alignItems:"center",gap:16}}>
+              <div style={{flex:1}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--text3)",marginBottom:6}}>
                   <span>Review progress</span>
-                  <span>{counts.approved} / {transactions.length} approved</span>
+                  <span>{counts.approved} / {isCardholder?myTxs.length:transactions.length} approved</span>
                 </div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${(counts.approved / transactions.length) * 100}%` }} />
-                </div>
+                <div className="progress-bar"><div className="progress-fill" style={{width:`${(counts.approved/Math.max(isCardholder?myTxs.length:transactions.length,1))*100}%`}}/></div>
               </div>
-              <div style={{ fontSize: 11, color: "var(--ink3)" }}>
-                {Math.round((counts.approved / transactions.length) * 100)}%
-              </div>
+              <span style={{fontSize:12,color:"var(--text3)",fontFamily:"var(--mono)"}}>{Math.round((counts.approved/Math.max(isCardholder?myTxs.length:transactions.length,1))*100)}%</span>
             </div>
 
             {/* Toolbar */}
-            <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-              <div style={{ display: "flex", background: "var(--paper2)", borderRadius: 8, border: "1px solid var(--rule)", overflow: "hidden" }}>
-                {["all","pending","submitted","approved","flagged","exported"].map(f => (
-                  <button key={f} onClick={() => setFilterStatus(f)}
-                    style={{ padding: "7px 12px", fontSize: 11, border: "none", background: filterStatus===f ? "var(--ink)" : "transparent", color: filterStatus===f ? "var(--paper)" : "var(--ink2)", fontFamily: "var(--mono)", fontWeight: filterStatus===f ? 600 : 400, transition: "all 0.15s" }}>
-                    {f.charAt(0).toUpperCase()+f.slice(1)} <span style={{ opacity: 0.6 }}>({counts[f] ?? filtered.length})</span>
+            <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+              <div style={{display:"flex",background:"var(--surface)",borderRadius:10,border:"1px solid var(--border)",overflow:"hidden"}}>
+                {["all","pending","submitted","approved","flagged","exported"].map(f=>(
+                  <button key={f} onClick={()=>setFilterStatus(f)} style={{padding:"7px 11px",fontSize:11,border:"none",background:filterStatus===f?"var(--surface3)":"transparent",color:filterStatus===f?"var(--text)":"var(--text3)",fontFamily:"var(--mono)",fontWeight:filterStatus===f?600:400,transition:"all 0.15s"}}>
+                    {f.charAt(0).toUpperCase()+f.slice(1)}<span style={{opacity:0.5,marginLeft:4}}>({counts[f]??vis.length})</span>
                   </button>
                 ))}
               </div>
-
-              {isReviewer && (
-                <select value={filterCardholder} onChange={e => setFilterCardholder(e.target.value)} style={{ width: "auto", minWidth: 160 }}>
-                  {CARDHOLDERS.map(c => <option key={c}>{c}</option>)}
+              {isReviewer&&(
+                <select value={filterUser} onChange={e=>setFilterUser(e.target.value)} style={{width:"auto",minWidth:160,fontSize:12}}>
+                  <option value="all">All cardholders</option>
+                  {users.filter(u=>u.role==="cardholder").map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
               )}
-
-              <input
-                type="text" placeholder="Search vendor or description..."
-                value={search} onChange={e => setSearch(e.target.value)}
-                style={{ width: 220 }}
-              />
-
-              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-                <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => csvRef.current.click()}>
-                  ↑ Import CSV
-                </button>
-                <input ref={csvRef} type="file" accept=".csv,.xlsx" style={{ display: "none" }} onChange={e => handleCSV(e.target.files[0])} />
-                <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => receiptFolderRef.current.click()}>
-                  📎 Upload Receipts Folder
-                </button>
-                <input ref={receiptFolderRef} type="file" accept="image/*,application/pdf" multiple style={{ display: "none" }}
-                  onChange={e => handleReceiptFolder(e.target.files)} />
+              <input type="text" placeholder="Search vendor or description..." value={search} onChange={e=>setSearch(e.target.value)} style={{width:220}}/>
+              <div style={{marginLeft:"auto",display:"flex",gap:8}}>
+                {!stmtLocked&&<><button className="btn-secondary" style={{fontSize:12}} onClick={()=>csvRef.current.click()}>↑ Import CSV</button><input ref={csvRef} type="file" accept=".csv" style={{display:"none"}} onChange={e=>handleCSV(e.target.files[0])}/></>}
               </div>
             </div>
-
-            {csvError && <div style={{ fontSize: 12, color: "var(--accent)", marginBottom: 12, fontFamily: "var(--mono)" }}>⚠ {csvError}</div>}
+            {csvErr&&<div className="alert-error" style={{marginBottom:12}}>{csvErr}</div>}
 
             {/* Table */}
-            <div className="card" style={{ overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 1fr 100px 100px 100px 90px 60px", gap: 0, padding: "10px 16px", background: "var(--paper2)", borderBottom: "1px solid var(--rule)", fontSize: 10, color: "var(--ink3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                <span>Date</span><span>Vendor</span><span>GL · Dept</span><span>Cardholder</span><span style={{ textAlign: "right" }}>Amount</span><span style={{ textAlign: "center" }}>Receipt</span><span style={{ textAlign: "center" }}>Status</span><span></span>
+            <div className="card" style={{overflow:"hidden"}}>
+              <div style={{display:"grid",gridTemplateColumns:"86px 1fr 1fr 100px 110px 84px 80px 32px",padding:"10px 16px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em"}}>
+                <span>Date</span><span>Vendor</span><span>GL · Dept</span><span>Cardholder</span><span style={{textAlign:"right"}}>Amount</span><span style={{textAlign:"center"}}>Receipt</span><span style={{textAlign:"center"}}>Status</span><span/>
               </div>
-              <div style={{ overflowY: "auto", maxHeight: "calc(100vh - 380px)" }}>
-                {filtered.length === 0 && (
-                  <div style={{ padding: 32, textAlign: "center", color: "var(--ink3)", fontSize: 13 }}>No transactions match your filters</div>
-                )}
-                {filtered.map(t => (
-                  <div key={t.id} className={`tx-row ${selectedTxId === t.id ? "selected" : ""}`}
-                    style={{ display: "grid", gridTemplateColumns: "90px 1fr 1fr 100px 100px 100px 90px 60px", alignItems: "center", padding: "11px 16px", cursor: "pointer", gap: 0 }}
-                    onClick={() => setSelectedTxId(t.id)}>
-                    <span style={{ fontSize: 12, color: "var(--ink2)" }}>{fmtDate(t.date)}</span>
-                    <div>
-                      <div style={{ fontSize: 13, color: "var(--ink)", fontWeight: 500, fontFamily: "var(--sans)" }}>{t.vendor}</div>
-                      <div style={{ fontSize: 11, color: "var(--ink3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>{t.description}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
-                        <span style={{ color: "var(--ink2)" }}>{t.gl}</span>
-                        <span style={{ color: "var(--ink3)" }}>· {t.glName}</span>
-                        {t.autoAssigned && <span className="tag tag-ai" style={{ fontSize: 9, padding: "1px 5px" }}>AI</span>}
-                        {t.confidence && <ConfidenceDot level={t.confidence} />}
+              <div style={{overflowY:"auto",maxHeight:"calc(100vh - 420px)"}}>
+                {vis.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--text3)",fontSize:13}}>No transactions match your filters.</div>}
+                {vis.map(t=>{
+                  const owner=users.find(u=>u.id===t.userId);
+                  return(
+                    <div key={t.id} className={`tx-row ${selectedTxId===t.id?"selected":""}`}
+                      style={{display:"grid",gridTemplateColumns:"86px 1fr 1fr 100px 110px 84px 80px 32px",alignItems:"center",padding:"11px 16px",cursor:"pointer"}}
+                      onClick={()=>setSelectedTxId(t.id)}>
+                      <span style={{fontSize:12,color:"var(--text3)",fontFamily:"var(--mono)"}}>{fmtDate(t.date)}</span>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{t.vendor}</div>
+                        <div style={{fontSize:11,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:200}}>{t.description}</div>
                       </div>
-                      <div style={{ fontSize: 11, color: "var(--ink3)", marginTop: 2 }}>
-                        {t.dept}
-                        {t.reconId && <span style={{ marginLeft: 6, fontFamily: "var(--mono)", fontSize: 10, color: "var(--accent2)", background: "var(--ink)", borderRadius: 3, padding: "1px 5px" }}>{t.reconId}</span>}
+                      <div>
+                        <div style={{fontSize:11,display:"flex",alignItems:"center",gap:5}}>
+                          <span style={{color:"var(--text2)",fontFamily:"var(--mono)"}}>{t.gl}</span>
+                          <span style={{color:"var(--text3)"}}>· {t.glName}</span>
+                          {t.autoAssigned&&<span className="tag tag-ai" style={{fontSize:9,padding:"1px 5px"}}>AI</span>}
+                          {t.confidence&&<ConfDot level={t.confidence}/>}
+                        </div>
+                        <div style={{fontSize:11,color:"var(--text3)",marginTop:2,display:"flex",alignItems:"center",gap:5}}>
+                          {t.dept}
+                          {t.reconId&&<span style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--accent)",background:"var(--accent-dim)",borderRadius:4,padding:"1px 5px",border:"1px solid var(--accent-border)"}}>{t.reconId}</span>}
+                        </div>
                       </div>
+                      <span style={{fontSize:12,color:"var(--text2)"}}>{owner?.name.split(" ")[0]||"—"}</span>
+                      <span style={{fontFamily:"var(--mono)",fontSize:13,fontWeight:600,color:"var(--text)",textAlign:"right"}}>{fmt(t.amount)}</span>
+                      <div style={{textAlign:"center"}}>{t.receipt?<span title={t.receipt.name} style={{cursor:"default"}}>📎{t.receiptMatch&&<span style={{fontSize:9,color:"var(--purple)"}}> ⚡</span>}</span>:<span style={{opacity:0.2}}>📎</span>}</div>
+                      <div style={{textAlign:"center"}}><StatusTag status={t.status}/></div>
+                      <div style={{color:"var(--text3)"}}>›</div>
                     </div>
-                    <span style={{ fontSize: 11, color: "var(--ink2)" }}>{t.cardholder.split(" ")[0]}</span>
-                    <span style={{ fontFamily: "var(--mono)", fontSize: 13, color: "var(--ink)", fontWeight: 600, textAlign: "right" }}>{fmt(t.amount)}</span>
-                    <div style={{ textAlign: "center" }}>
-                      {t.receipt
-                        ? <span className="tooltip" data-tip={t.receipt.name} style={{ cursor: "default" }}>
-                            📎{t.receiptMatch && <span style={{ fontSize: 9, color: "#4a1c8a" }}> ⚡</span>}
-                          </span>
-                        : <span style={{ opacity: 0.25, fontSize: 14 }}>📎</span>}
-                    </div>
-                    <div style={{ textAlign: "center" }}><StatusTag status={t.status} /></div>
-                    <div style={{ textAlign: "right" }}>
-                      <span style={{ fontSize: 16, color: "var(--ink3)" }}>›</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
-            {/* Bulk actions for reviewer */}
-            {isReviewer && counts.submitted > 0 && (
-              <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center" }}>
-                <button className="btn-secondary" style={{ fontSize: 12, background: "#d4edda", color: "#1a5c35", border: "1px solid #b8dfc6" }}
-                  onClick={() => setTransactions(prev => prev.map(t => t.status === "submitted" ? { ...t, status: "approved", reviewedBy: currentUser.name, reviewedAt: new Date().toISOString() } : t))}>
+            {isReviewer&&counts.submitted>0&&(
+              <div style={{marginTop:14}}>
+                <button className="btn-success" style={{fontSize:12}} onClick={()=>setTransactions(prev=>prev.map(t=>t.status==="submitted"?{...t,status:"approved"}:t))}>
                   ✓ Approve All Submitted ({counts.submitted})
                 </button>
               </div>
@@ -1029,134 +918,111 @@ export default function App() {
           </>
         )}
 
-        {/* ── RECEIPTS TAB ── */}
-        {activeTab === "receipts" && (
-          <div style={{ maxWidth: 700 }}>
-            <div style={{ fontFamily: "var(--sans)", fontWeight: 800, fontSize: 22, color: "var(--ink)", letterSpacing: "-0.03em", marginBottom: 6 }}>Receipt Management</div>
-            <div style={{ fontSize: 12, color: "var(--ink3)", marginBottom: 24 }}>Upload your monthly receipt folder. AI reads each file and matches it to a transaction by vendor, amount, and date.</div>
-
-            {/* Upload zone */}
-            <div className="card" style={{ padding: 24, marginBottom: 20 }}>
-              <div
-                className="drop-zone"
-                style={{ padding: "40px 24px", textAlign: "center" }}
-                onClick={() => receiptFolderRef.current.click()}
-                onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add("drag-over"); }}
-                onDragLeave={e => e.currentTarget.classList.remove("drag-over")}
-                onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove("drag-over"); handleReceiptFolder(e.dataTransfer.files); }}
-              >
-                <div style={{ fontSize: 36, marginBottom: 12 }}>📂</div>
-                <div style={{ fontFamily: "var(--sans)", fontWeight: 700, fontSize: 16, color: "var(--ink)", marginBottom: 6 }}>Drop your receipts folder here</div>
-                <div style={{ fontSize: 12, color: "var(--ink3)" }}>Select multiple files · PDF, JPG, PNG accepted · AI will match to transactions</div>
+        {/* RECEIPTS */}
+        {activeTab==="receipts"&&(
+          <div style={{maxWidth:700}}>
+            <div style={{fontSize:18,fontWeight:700,color:"var(--text)",letterSpacing:"-0.02em",marginBottom:6}}>Receipt Management</div>
+            <div style={{fontSize:13,color:"var(--text3)",marginBottom:24}}>Upload your monthly receipts folder. AI reads each file and matches it to a transaction by vendor, amount & date.</div>
+            <div className="card" style={{padding:24,marginBottom:20}}>
+              <div className="drop-zone" style={{padding:"44px 24px",textAlign:"center"}} onClick={()=>rcptRef.current.click()}
+                onDragOver={e=>{e.preventDefault();e.currentTarget.classList.add("drag-over");}}
+                onDragLeave={e=>e.currentTarget.classList.remove("drag-over")}
+                onDrop={e=>{e.preventDefault();e.currentTarget.classList.remove("drag-over");handleRcptFolder(e.dataTransfer.files);}}>
+                <div style={{fontSize:32,marginBottom:12}}>📂</div>
+                <div style={{fontSize:15,fontWeight:600,color:"var(--text)",marginBottom:6}}>Drop receipts folder here</div>
+                <div style={{fontSize:12,color:"var(--text3)"}}>Multiple files · PDF, JPG, PNG · AI will match to transactions</div>
               </div>
-              <input ref={receiptFolderRef} type="file" accept="image/*,application/pdf" multiple style={{ display: "none" }}
-                onChange={e => handleReceiptFolder(e.target.files)} />
+              <input ref={rcptRef} type="file" accept="image/*,application/pdf" multiple style={{display:"none"}} onChange={e=>handleRcptFolder(e.target.files)}/>
             </div>
-
-            {/* Matched summary */}
-            <div className="card" style={{ padding: 20 }}>
-              <div style={{ fontSize: 11, color: "var(--ink3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Receipt Status by Transaction</div>
-              {transactions.map(t => (
-                <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: "1px solid var(--rule)" }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, color: "var(--ink)", fontFamily: "var(--sans)", fontWeight: 500 }}>{t.vendor}</div>
-                    <div style={{ fontSize: 11, color: "var(--ink3)" }}>{fmtDate(t.date)} · {fmt(t.amount)}</div>
+            <div className="card" style={{overflow:"hidden"}}>
+              <div style={{padding:"12px 16px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em"}}>Receipt Status · All Transactions</div>
+              {(isCardholder?myTxs:transactions).map(t=>(
+                <div key={t.id} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",borderBottom:"1px solid var(--border)"}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{t.vendor}</div>
+                    <div style={{fontSize:11,color:"var(--text3)",fontFamily:"var(--mono)"}}>{fmtDate(t.date)} · {fmt(t.amount)}</div>
                   </div>
-                  {t.receipt ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      {t.receiptMatch && <span className="tag tag-ai">⚡ AI matched</span>}
-                      <span className="tag tag-green">📎 {t.receipt.name.length > 18 ? t.receipt.name.slice(0,15) + "…" : t.receipt.name}</span>
+                  {t.receipt?(
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      {t.receiptMatch&&<span className="tag tag-ai">⚡ AI</span>}
+                      <span className="tag tag-green">📎 {t.receipt.name.length>20?t.receipt.name.slice(0,17)+"…":t.receipt.name}</span>
                     </div>
-                  ) : (
-                    <span className="tag tag-red">Missing</span>
-                  )}
+                  ):<span className="tag tag-red">⚠ Missing</span>}
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* ── SETTINGS TAB ── */}
-        {activeTab === "settings" && (
-          <div style={{ maxWidth: 600 }}>
-            <div style={{ fontFamily: "var(--sans)", fontWeight: 800, fontSize: 22, color: "var(--ink)", letterSpacing: "-0.03em", marginBottom: 24 }}>Settings</div>
+        {/* USERS */}
+        {activeTab==="users"&&isAdmin&&<UserMgmt users={users} onUpdate={setUsers}/>}
 
-            <div className="card" style={{ padding: 24, marginBottom: 16 }}>
-              <div style={{ fontFamily: "var(--sans)", fontWeight: 700, fontSize: 15, color: "var(--ink)", marginBottom: 4 }}>Chart of Accounts</div>
-              <div style={{ fontSize: 12, color: "var(--ink3)", marginBottom: 16 }}>Your GL codes power the AI auto-assignment. Keep them current with your NetSuite chart of accounts.</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16, maxHeight: 200, overflowY: "auto" }}>
-                {glAccounts.map(g => (
-                  <div key={g.code} style={{ display: "flex", gap: 12, fontSize: 12, padding: "6px 10px", background: "var(--paper2)", borderRadius: 6 }}>
-                    <span style={{ color: "var(--ink)", fontWeight: 600, minWidth: 48 }}>{g.code}</span>
-                    <span style={{ color: "var(--ink2)" }}>{g.name}</span>
+        {/* SETTINGS */}
+        {activeTab==="settings"&&!isCardholder&&(
+          <div style={{maxWidth:620}}>
+            <div style={{fontSize:18,fontWeight:700,color:"var(--text)",letterSpacing:"-0.02em",marginBottom:24}}>Settings</div>
+
+            <div className="card" style={{padding:24,marginBottom:16}}>
+              <div style={{fontSize:14,fontWeight:600,color:"var(--text)",marginBottom:4}}>Chart of Accounts</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>GL codes used for AI auto-assignment.</div>
+              <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto",marginBottom:14}}>
+                {glAccounts.map(g=>(
+                  <div key={g.code} style={{display:"flex",gap:12,fontSize:12,padding:"6px 10px",background:"var(--surface2)",borderRadius:6,fontFamily:"var(--mono)"}}>
+                    <span style={{color:"var(--accent)",minWidth:48}}>{g.code}</span>
+                    <span style={{color:"var(--text2)"}}>{g.name}</span>
                   </div>
                 ))}
               </div>
-              <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => setShowGLSettings(true)}>Edit Chart of Accounts</button>
+              <button className="btn-secondary" style={{fontSize:12}} onClick={()=>setShowGL(true)}>Edit Chart of Accounts</button>
             </div>
 
-            <div className="card" style={{ padding: 24, marginBottom: 16 }}>
-              <div style={{ fontFamily: "var(--sans)", fontWeight: 700, fontSize: 15, color: "var(--ink)", marginBottom: 4 }}>NetSuite Connection</div>
-              <div style={{ fontSize: 12, color: "var(--ink3)", marginBottom: 16 }}>Configure your TBA credentials to enable live export. Currently running in simulation mode.</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-                {["Account ID", "Consumer Key", "Consumer Secret", "Token ID", "Token Secret"].map(f => (
-                  <div key={f}>
-                    <label style={{ fontSize: 10, color: "var(--ink3)", display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.08em" }}>{f}</label>
-                    <input type={f.includes("Secret") || f.includes("Key") ? "password" : "text"} placeholder={`Enter ${f}...`} />
-                  </div>
+            <div className="card" style={{padding:24,marginBottom:16}}>
+              <div style={{fontSize:14,fontWeight:600,color:"var(--text)",marginBottom:4}}>NetSuite Connection</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>TBA credentials for live export. Currently simulated.</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+                {["Account ID","Consumer Key","Consumer Secret","Token ID","Token Secret"].map(f=>(
+                  <div key={f} className="input-group"><label className="input-label">{f}</label><input type={f.includes("Secret")||f.includes("Key")?"password":"text"} placeholder={`Enter ${f}...`}/></div>
                 ))}
               </div>
-              <div style={{ display: "flex", gap: 10 }}>
-                <button className="btn-primary" style={{ fontSize: 12 }}>Save Credentials</button>
-                <button className="btn-secondary" style={{ fontSize: 12 }}>Test Connection</button>
+              <div style={{display:"flex",gap:10,marginBottom:12}}>
+                <button className="btn-primary" style={{fontSize:12}}>Save Credentials</button>
+                <button className="btn-secondary" style={{fontSize:12}}>Test Connection</button>
               </div>
-              <div style={{ marginTop: 12, fontSize: 11, color: "var(--ink3)", background: "var(--paper2)", borderRadius: 6, padding: "8px 12px" }}>
-                ℹ Credentials are stored locally in your browser. Never shared externally. Use TBA (Token-Based Authentication) from NetSuite Setup → Integrations.
-              </div>
+              <div style={{fontSize:11,color:"var(--text3)",background:"var(--surface2)",borderRadius:8,padding:"10px 14px"}}>ℹ Use TBA from NetSuite Setup → Integrations. Credentials stored locally in browser.</div>
             </div>
 
-            <div className="card" style={{ padding: 24 }}>
-              <div style={{ fontFamily: "var(--sans)", fontWeight: 700, fontSize: 15, color: "var(--ink)", marginBottom: 4 }}>Auto-Assignment Rules</div>
-              <div style={{ fontSize: 12, color: "var(--ink3)", marginBottom: 14 }}>Vendor → GL mapping used by AI. Editing coming soon.</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 200, overflowY: "auto" }}>
-                {Object.entries(GL_RULES).slice(0, 12).map(([vendor, rule]) => (
-                  <div key={vendor} style={{ display: "grid", gridTemplateColumns: "1fr 80px 1fr", gap: 8, fontSize: 11, padding: "5px 8px", background: "var(--paper2)", borderRadius: 5 }}>
-                    <span style={{ color: "var(--ink)", fontWeight: 500 }}>{vendor}</span>
-                    <span style={{ color: "var(--ink3)", textAlign: "center" }}>→</span>
-                    <span style={{ color: "var(--ink2)" }}>{rule.gl} · {rule.glName}</span>
+            <div className="card" style={{padding:24,marginBottom:16}}>
+              <div style={{fontSize:14,fontWeight:600,color:"var(--text)",marginBottom:4}}>Auto-Assignment Rules</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Vendor → GL mapping used by AI.</div>
+              <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:200,overflowY:"auto"}}>
+                {Object.entries(GL_RULES_DATA).map(([vendor,rule])=>(
+                  <div key={vendor} style={{display:"grid",gridTemplateColumns:"1fr 36px 1fr",gap:8,fontSize:11,padding:"6px 10px",background:"var(--surface2)",borderRadius:6,fontFamily:"var(--mono)"}}>
+                    <span style={{color:"var(--text)"}}>{vendor}</span>
+                    <span style={{color:"var(--text3)",textAlign:"center"}}>→</span>
+                    <span style={{color:"var(--accent)"}}>{rule.gl} · {rule.glName}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Export History */}
-            <div className="card" style={{ padding: 24, marginTop: 16 }}>
-              <div style={{ fontFamily: "var(--sans)", fontWeight: 700, fontSize: 15, color: "var(--ink)", marginBottom: 4 }}>Export History</div>
-              <div style={{ fontSize: 12, color: "var(--ink3)", marginBottom: 16 }}>Every reconciliation pushed to NetSuite, with its internal ID for cross-referencing.</div>
-              {exportHistory.length === 0 ? (
-                <div style={{ fontSize: 12, color: "var(--ink3)", fontFamily: "var(--mono)", padding: "20px 0", textAlign: "center", borderTop: "1px solid var(--rule)" }}>
-                  No exports yet. Approve transactions and export to NetSuite to see history here.
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {exportHistory.map((r) => (
-                    <div key={r.reconId} style={{ background: "var(--paper2)", border: "1px solid var(--rule)", borderRadius: 10, padding: "14px 16px" }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                        <div style={{ fontFamily: "var(--mono)", fontWeight: 600, fontSize: 15, color: "var(--ink)", letterSpacing: "0.02em" }}>{r.reconId}</div>
+            <div className="card" style={{padding:24}}>
+              <div style={{fontSize:14,fontWeight:600,color:"var(--text)",marginBottom:4}}>Export History</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>All reconciliation batches pushed to NetSuite.</div>
+              {exportHistory.length===0?(
+                <div style={{fontSize:12,color:"var(--text3)",fontFamily:"var(--mono)",padding:"20px 0",textAlign:"center",borderTop:"1px solid var(--border)"}}>No exports yet.</div>
+              ):(
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {exportHistory.map(r=>(
+                    <div key={r.reconId} style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 16px"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                        <div style={{fontFamily:"var(--mono)",fontWeight:600,fontSize:14,color:"var(--accent)"}}>{r.reconId}</div>
                         <span className="tag tag-green">Exported</span>
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                        {[
-                          ["NetSuite ID", r.nsId],
-                          ["Total", fmt(r.total)],
-                          ["Lines", r.txCount],
-                          ["Receipts", `${r.receiptCount} attached`],
-                          ["Exported by", r.exportedBy],
-                          ["Exported at", fmtDateTime(r.exportedAt)],
-                        ].map(([k, v]) => (
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                        {[["NetSuite ID",r.nsId],["Total",fmt(r.total)],["Lines",r.txCount],["Receipts",`${r.receiptCount} attached`],["By",r.exportedBy],["At",fmtDateTime(r.exportedAt)]].map(([k,v])=>(
                           <div key={k}>
-                            <div style={{ fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>{k}</div>
-                            <div style={{ fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink)", fontWeight: 500 }}>{v}</div>
+                            <div style={{fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:3}}>{k}</div>
+                            <div style={{fontSize:11,fontFamily:"var(--mono)",color:"var(--text)",fontWeight:500}}>{v}</div>
                           </div>
                         ))}
                       </div>
@@ -1169,30 +1035,12 @@ export default function App() {
         )}
       </div>
 
-      {/* ── DRAWERS & MODALS ── */}
-      {selectedTx && (
-        <TxDrawer
-          tx={selectedTx}
-          glAccounts={glAccounts}
-          currentUser={currentUser}
-          onUpdate={update}
-          onClose={() => setSelectedTxId(null)}
-        />
-      )}
-      {showReceiptMatcher && (
-        <ReceiptMatcher
-          receipts={uploadedReceipts}
-          transactions={transactions}
-          onMatchConfirm={handleMatchConfirm}
-          onClose={() => setShowReceiptMatcher(false)}
-        />
-      )}
-      {showNS && (
-        <NetSuiteModal transactions={transactions} onClose={() => setShowNS(false)} onExportComplete={handleExportComplete} />
-      )}
-      {showGLSettings && (
-        <GLSettings glAccounts={glAccounts} onSave={setGlAccounts} onClose={() => setShowGLSettings(false)} />
-      )}
+      {/* OVERLAYS */}
+      {selectedTx&&<TxDrawer tx={selectedTx} glAccounts={glAccounts} currentUser={currentUser} onUpdate={update} onClose={()=>setSelectedTxId(null)} locked={isCardholder&&stmtLocked}/>}
+      {showStmt&&<StatementModal myTxs={myTxs} onConfirm={submitStmt} onClose={()=>setShowStmt(false)}/>}
+      {showMatcher&&<ReceiptMatcher receipts={uploadedReceipts} transactions={isCardholder?myTxs:transactions} onConfirm={handleMatchConfirm} onClose={()=>setShowMatcher(false)}/>}
+      {showNS&&<NSModal transactions={transactions} onClose={()=>setShowNS(false)} onDone={handleExportDone}/>}
+      {showGL&&<GLSettings glAccounts={glAccounts} onSave={setGlAccounts} onClose={()=>setShowGL(false)}/>}
     </div>
   );
 }
