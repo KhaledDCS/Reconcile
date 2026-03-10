@@ -137,6 +137,29 @@ const DEFAULT_GL_ACCOUNTS = [
 
 const DEPARTMENTS = ["Engineering","Sales","Marketing","Operations","G&A","HR","Finance","Legal"];
 
+// GL codes that flag a transaction as recurring/subscription
+const RECURRING_GL_CODES = new Set(["6100","6110","6120","6500"]);
+
+// Vendor keyword → userId auto-assignee (admin can edit in Settings)
+const DEFAULT_VENDOR_ASSIGNEES = {
+  "amazon web services": "u2",
+  "aws":                 "u2",
+  "slack":               "u2",
+  "zoom":                "u2",
+  "salesforce":          "u2",
+  "openai":              "u2",
+  "google":              "u2",
+  "linkedin":            "u4",
+};
+
+function getAssigneeId(vendor, rules) {
+  const v = vendor.toLowerCase();
+  for (const [k, uid] of Object.entries(rules)) { if (v.includes(k)) return uid; }
+  return null;
+}
+
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 const SAMPLE_TXS = [
   { id:1,  date:"2025-03-01", vendor:"Amazon Web Services", description:"Cloud infrastructure Feb",  amount:4821.50, card:"Visa ••4291",  userId:"u2" },
   { id:2,  date:"2025-03-02", vendor:"Slack Technologies",  description:"Team plan monthly",         amount:312.00,  card:"Visa ••4291",  userId:"u2" },
@@ -165,8 +188,17 @@ function autoAssign(vendor) {
   return { gl:"6800", glName:"Miscellaneous", dept:"G&A", confidence:"low", autoAssigned:true };
 }
 
-function initTx() {
-  return SAMPLE_TXS.map(t => ({ ...t, ...autoAssign(t.vendor), status:"pending", receipt:null, receiptMatch:null, memo:"", flagReason:"", reconId:null }));
+function initTx(vendorAssignees=DEFAULT_VENDOR_ASSIGNEES) {
+  return SAMPLE_TXS.map(t => {
+    const assigned = autoAssign(t.vendor);
+    return {
+      ...t, ...assigned,
+      isRecurring: RECURRING_GL_CODES.has(assigned.gl),
+      assigneeId: getAssigneeId(t.vendor, vendorAssignees) || t.userId,
+      autoAssignee: !!getAssigneeId(t.vendor, vendorAssignees),
+      status:"pending", receipt:null, receiptMatch:null, memo:"", flagReason:"", reconId:null
+    };
+  });
 }
 
 const ROLE_COLOR = { admin:"#a855f7", reviewer:"#4f7df3", cardholder:"#22c55e" };
@@ -433,7 +465,7 @@ function ReceiptMatcher({ receipts, transactions, onConfirm, onClose }) {
 }
 
 // ── TRANSACTION DRAWER ────────────────────────────────────────────────────────
-function TxDrawer({ tx, glAccounts, currentUser, onUpdate, onClose, locked }) {
+function TxDrawer({ tx, glAccounts, currentUser, allUsers, onUpdate, onClose, locked }) {
   const [local,setLocal]=useState({...tx});
   const fileRef=useRef();
   const isReviewer=currentUser.role==="reviewer"||currentUser.role==="admin";
@@ -472,6 +504,14 @@ function TxDrawer({ tx, glAccounts, currentUser, onUpdate, onClose, locked }) {
             <select value={local.dept} disabled={!canEdit} onChange={e=>setLocal(t=>({...t,dept:e.target.value}))}>
               {DEPARTMENTS.map(d=><option key={d}>{d}</option>)}
             </select>
+          </div>
+          <div>
+            <span className="sidebar-label">Assignee {local.autoAssignee&&<span className="tag tag-ai" style={{fontSize:9,padding:"1px 5px",verticalAlign:"middle"}}>⚡ Auto</span>}</span>
+            <select value={local.assigneeId||""} disabled={!isReviewer} onChange={e=>setLocal(t=>({...t,assigneeId:e.target.value,autoAssignee:false}))}>
+              <option value="">— Unassigned —</option>
+              {allUsers.filter(u=>u.active).map(u=><option key={u.id} value={u.id}>{u.name} ({ROLE_LABEL[u.role]})</option>)}
+            </select>
+            {local.isRecurring&&<div style={{marginTop:6,display:"flex",alignItems:"center",gap:6}}><span className="tag tag-purple" style={{fontSize:10}}>↻ Recurring charge</span><span style={{fontSize:11,color:"var(--text3)"}}>Auto-detected from GL {local.gl}</span></div>}
           </div>
           <div>
             <span className="sidebar-label">Memo</span>
@@ -667,11 +707,13 @@ function NSModal({ transactions, onClose, onDone }) {
 export default function App() {
   const [users,setUsers]=useState(INITIAL_USERS);
   const [currentUser,setCurrentUser]=useState(null);
-  const [transactions,setTransactions]=useState(initTx);
+  const [vendorAssignees,setVendorAssignees]=useState(DEFAULT_VENDOR_ASSIGNEES);
+  const [transactions,setTransactions]=useState(()=>initTx(DEFAULT_VENDOR_ASSIGNEES));
   const [glAccounts,setGlAccounts]=useState(DEFAULT_GL_ACCOUNTS);
   const [activeTab,setActiveTab]=useState("transactions");
   const [filterStatus,setFilterStatus]=useState("all");
   const [filterUser,setFilterUser]=useState("all");
+  const [filterMonth,setFilterMonth]=useState("all");
   const [search,setSearch]=useState("");
   const [selectedTxId,setSelectedTxId]=useState(null);
   const [showNS,setShowNS]=useState(false);
@@ -742,10 +784,14 @@ export default function App() {
     setTransactions(prev=>prev.map(t=>t.status==="approved"?{...t,status:"exported",reconId:full.reconId}:t));
   };
 
+  // derive available months from all transactions
+  const availableMonths = [...new Set(transactions.map(t=>t.date.slice(0,7)))].sort();
+
   const vis=transactions.filter(t=>{
     if(isCardholder&&t.userId!==currentUser.id)return false;
     if(filterStatus!=="all"&&t.status!==filterStatus)return false;
     if(filterUser!=="all"&&t.userId!==filterUser)return false;
+    if(filterMonth!=="all"&&!t.date.startsWith(filterMonth))return false;
     if(search&&!t.vendor.toLowerCase().includes(search.toLowerCase())&&!t.description.toLowerCase().includes(search.toLowerCase()))return false;
     return true;
   });
@@ -766,7 +812,7 @@ export default function App() {
   if(!currentUser)return <LoginPage users={users} onLogin={setCurrentUser}/>;
 
   const tabs=isCardholder?["transactions","receipts"]:isAdmin?["transactions","receipts","users","settings"]:["transactions","receipts","settings"];
-  const tabLabel={transactions:"Transactions",receipts:`Receipts${uploadedReceipts.length>0?` (${uploadedReceipts.length})`:""}`,users:"Users",settings:"Settings"};
+  const tabLabel={transactions:"Transactions",receipts:"Receipts"+(uploadedReceipts.length>0?" ("+uploadedReceipts.length+")":""),users:"Users",settings:"Settings"};
 
   return(
     <div style={{minHeight:"100vh",background:"var(--bg)"}}>
@@ -824,7 +870,7 @@ export default function App() {
 
             {/* Stats */}
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(148px,1fr))",gap:12,marginBottom:24}}>
-              {[{l:"Total",v:fmt(totalAmt),s:`${vis.length} transactions`},{l:"Pending",v:counts.pending,s:"to review",c:"var(--amber)"},{l:"In Review",v:counts.submitted,s:"submitted",c:"var(--accent)"},{l:"Approved",v:fmt(approvedAmt),s:`${counts.approved} lines`,c:"var(--green)"},{l:"Flagged",v:counts.flagged,s:"need attention",c:"var(--red)"}].map(s=>(
+              {[{l:"Total",v:fmt(totalAmt),s:`${vis.length} transactions`},{l:"Pending",v:counts.pending,s:"to review",c:"var(--amber)"},{l:"In Review",v:counts.submitted,s:"submitted",c:"var(--accent)"},{l:"Approved",v:fmt(approvedAmt),s:`${counts.approved} lines`,c:"var(--green)"},{l:"Flagged",v:counts.flagged,s:"need attention",c:"var(--red)"},{l:"Recurring",v:vis.filter(t=>t.isRecurring).length,s:"subscriptions",c:"var(--purple)"}].map(s=>(
                 <div key={s.l} className="stat-card">
                   <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>{s.l}</div>
                   <div style={{fontSize:22,fontWeight:700,color:s.c||"var(--text)",letterSpacing:"-0.03em"}}>{s.v}</div>
@@ -854,6 +900,14 @@ export default function App() {
                   </button>
                 ))}
               </div>
+              {/* Month / statement dropdown */}
+              <select value={filterMonth} onChange={e=>setFilterMonth(e.target.value)} style={{width:"auto",minWidth:130,fontSize:12}}>
+                <option value="all">All months</option>
+                {availableMonths.map(m=>{
+                  const [y,mo]=m.split("-");
+                  return <option key={m} value={m}>{MONTHS[+mo-1]} {y}</option>;
+                })}
+              </select>
               {isReviewer&&(
                 <select value={filterUser} onChange={e=>setFilterUser(e.target.value)} style={{width:"auto",minWidth:160,fontSize:12}}>
                   <option value="all">All cardholders</option>
@@ -869,20 +923,24 @@ export default function App() {
 
             {/* Table */}
             <div className="card" style={{overflow:"hidden"}}>
-              <div style={{display:"grid",gridTemplateColumns:"86px 1fr 1fr 100px 110px 84px 80px 32px",padding:"10px 16px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em"}}>
-                <span>Date</span><span>Vendor</span><span>GL · Dept</span><span>Cardholder</span><span style={{textAlign:"right"}}>Amount</span><span style={{textAlign:"center"}}>Receipt</span><span style={{textAlign:"center"}}>Status</span><span/>
+              <div style={{display:"grid",gridTemplateColumns:"82px 1fr 1fr 96px 96px 110px 80px 80px 28px",padding:"10px 16px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em"}}>
+                <span>Date</span><span>Vendor</span><span>GL · Dept</span><span>Cardholder</span><span>Assignee</span><span style={{textAlign:"right"}}>Amount</span><span style={{textAlign:"center"}}>Receipt</span><span style={{textAlign:"center"}}>Status</span><span/>
               </div>
               <div style={{overflowY:"auto",maxHeight:"calc(100vh - 420px)"}}>
                 {vis.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--text3)",fontSize:13}}>No transactions match your filters.</div>}
                 {vis.map(t=>{
                   const owner=users.find(u=>u.id===t.userId);
+                  const assignee=users.find(u=>u.id===t.assigneeId);
                   return(
-                    <div key={t.id} className={`tx-row ${selectedTxId===t.id?"selected":""}`}
-                      style={{display:"grid",gridTemplateColumns:"86px 1fr 1fr 100px 110px 84px 80px 32px",alignItems:"center",padding:"11px 16px",cursor:"pointer"}}
+                    <div key={t.id} className={"tx-row"+(selectedTxId===t.id?" selected":"")}
+                      style={{display:"grid",gridTemplateColumns:"82px 1fr 1fr 96px 96px 110px 80px 80px 28px",alignItems:"center",padding:"11px 16px",cursor:"pointer"}}
                       onClick={()=>setSelectedTxId(t.id)}>
                       <span style={{fontSize:12,color:"var(--text3)",fontFamily:"var(--mono)"}}>{fmtDate(t.date)}</span>
                       <div>
-                        <div style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{t.vendor}</div>
+                        <div style={{fontSize:13,fontWeight:600,color:"var(--text)",display:"flex",alignItems:"center",gap:6}}>
+                          {t.vendor}
+                          {t.isRecurring&&<span className="tag tag-purple" style={{fontSize:9,padding:"1px 6px"}}>↻ Recurring</span>}
+                        </div>
                         <div style={{fontSize:11,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:200}}>{t.description}</div>
                       </div>
                       <div>
@@ -898,6 +956,9 @@ export default function App() {
                         </div>
                       </div>
                       <span style={{fontSize:12,color:"var(--text2)"}}>{owner?.name.split(" ")[0]||"—"}</span>
+                      <div style={{display:"flex",alignItems:"center",gap:5}}>
+                        {assignee?<><Av name={assignee.name} color={ROLE_COLOR[assignee.role]} size={20}/><span style={{fontSize:11,color:"var(--text2)"}}>{assignee.name.split(" ")[0]}</span>{t.autoAssignee&&<span style={{fontSize:9,color:"var(--purple)"}}>⚡</span>}</>:<span style={{fontSize:11,color:"var(--text3)"}}>—</span>}
+                      </div>
                       <span style={{fontFamily:"var(--mono)",fontSize:13,fontWeight:600,color:"var(--text)",textAlign:"right"}}>{fmt(t.amount)}</span>
                       <div style={{textAlign:"center"}}>{t.receipt?<span title={t.receipt.name} style={{cursor:"default"}}>📎{t.receiptMatch&&<span style={{fontSize:9,color:"var(--purple)"}}> ⚡</span>}</span>:<span style={{opacity:0.2}}>📎</span>}</div>
                       <div style={{textAlign:"center"}}><StatusTag status={t.status}/></div>
@@ -1005,6 +1066,31 @@ export default function App() {
               </div>
             </div>
 
+            <div className="card" style={{padding:24,marginBottom:16}}>
+              <div style={{fontSize:14,fontWeight:600,color:"var(--text)",marginBottom:4}}>Assignee Rules</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Map vendor keywords to a default assignee. Finance and admin can override per transaction.</div>
+              <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
+                {Object.entries(vendorAssignees).map(([vendor,uid])=>{
+                  const u=users.find(x=>x.id===uid);
+                  return(
+                    <div key={vendor} style={{display:"grid",gridTemplateColumns:"1fr auto 1fr auto",gap:8,alignItems:"center",padding:"8px 12px",background:"var(--surface2)",borderRadius:8}}>
+                      <span style={{fontSize:12,fontFamily:"var(--mono)",color:"var(--text)"}}>{vendor}</span>
+                      <span style={{color:"var(--text3)",fontSize:12}}>→</span>
+                      <select value={uid} onChange={e=>setVendorAssignees(a=>({...a,[vendor]:e.target.value}))} style={{fontSize:12}}>
+                        {users.filter(x=>x.active).map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
+                      </select>
+                      <button className="btn-danger" style={{fontSize:11,padding:"4px 10px"}} onClick={()=>setVendorAssignees(a=>{const n={...a};delete n[vendor];return n;})}>✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+              <button className="btn-secondary" style={{fontSize:12}} onClick={()=>{
+                const vendor=prompt("Vendor keyword (lowercase):");
+                if(!vendor)return;
+                setVendorAssignees(a=>({...a,[vendor.toLowerCase()]:users.find(u=>u.role==="cardholder")?.id||""}));
+              }}>+ Add Rule</button>
+            </div>
+
             <div className="card" style={{padding:24}}>
               <div style={{fontSize:14,fontWeight:600,color:"var(--text)",marginBottom:4}}>Export History</div>
               <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>All reconciliation batches pushed to NetSuite.</div>
@@ -1036,7 +1122,7 @@ export default function App() {
       </div>
 
       {/* OVERLAYS */}
-      {selectedTx&&<TxDrawer tx={selectedTx} glAccounts={glAccounts} currentUser={currentUser} onUpdate={update} onClose={()=>setSelectedTxId(null)} locked={isCardholder&&stmtLocked}/>}
+      {selectedTx&&<TxDrawer tx={selectedTx} glAccounts={glAccounts} currentUser={currentUser} allUsers={users} onUpdate={update} onClose={()=>setSelectedTxId(null)} locked={isCardholder&&stmtLocked}/>}
       {showStmt&&<StatementModal myTxs={myTxs} onConfirm={submitStmt} onClose={()=>setShowStmt(false)}/>}
       {showMatcher&&<ReceiptMatcher receipts={uploadedReceipts} transactions={isCardholder?myTxs:transactions} onConfirm={handleMatchConfirm} onClose={()=>setShowMatcher(false)}/>}
       {showNS&&<NSModal transactions={transactions} onClose={()=>setShowNS(false)} onDone={handleExportDone}/>}
