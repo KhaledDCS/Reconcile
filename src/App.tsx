@@ -418,46 +418,223 @@ function GLSettings({ glAccounts, onSave, onClose }) {
 }
 
 // ── RECEIPT MATCHER ───────────────────────────────────────────────────────────
-function ReceiptMatcher({ receipts, transactions, onConfirm, onClose }) {
-  const [matches,setMatches]=useState(()=>{
-    const m={};
-    receipts.forEach((r,i)=>{const tx=transactions[i%transactions.length];m[r.name]={txId:tx?.id,confidence:["high","medium","low"][i%3]};});
-    return m;
+// Convert a File/Blob URL back to base64 for the API
+async function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
   });
-  return(
+}
+
+function ReceiptMatcher({ receipts, rawFiles, transactions, onConfirm, onClose }) {
+  const [matches, setMatches]   = useState({});
+  const [extracted, setExtracted] = useState({}); // { filename: {vendor,amount,date,raw} }
+  const [status, setStatus]     = useState("idle"); // idle | running | done | error
+  const [current, setCurrent]   = useState(""); // which file is being processed
+  const [errMsg, setErrMsg]     = useState("");
+
+  // Run AI matching as soon as modal opens
+  useEffect(() => { runMatching(); }, []);
+
+  const runMatching = async () => {
+    setStatus("running");
+    setErrMsg("");
+    const newExtracted = {};
+    const newMatches   = {};
+
+    for (const file of rawFiles) {
+      setCurrent(file.name);
+      try {
+        // 1. Convert file to base64
+        const b64  = await fileToBase64(file);
+        const isPdf = file.type === "application/pdf";
+        const mediaType = isPdf ? "application/pdf" : (file.type || "image/jpeg");
+
+        // 2. Build transaction list for Claude to compare against
+        const txList = transactions.map(t =>
+          `ID:${t.id} | ${fmtDate(t.date)} | ${t.vendor} | ${fmt(t.amount)}`
+        ).join("\n");
+
+        // 3. Call Claude vision API
+        const response = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 1000,
+            messages: [{
+              role: "user",
+              content: [
+                {
+                  type: isPdf ? "document" : "image",
+                  source: { type: "base64", media_type: mediaType, data: b64 },
+                },
+                {
+                  type: "text",
+                  text: `You are a receipt matching assistant. Analyze this receipt and extract key fields, then match it to the best transaction from the list below.
+
+TRANSACTIONS:
+${txList}
+
+Instructions:
+1. Extract from the receipt: vendor name, total amount, and date.
+2. Find the best matching transaction by comparing vendor, amount, and date.
+3. Assign a confidence level: "high" (vendor+amount match well), "medium" (partial match), "low" (weak match), or "none" (no match found).
+
+Respond ONLY with valid JSON, no markdown, no explanation:
+{
+  "extracted": {
+    "vendor": "...",
+    "amount": 0.00,
+    "date": "YYYY-MM-DD",
+    "notes": "brief note about what you saw"
+  },
+  "match": {
+    "txId": <number or null>,
+    "confidence": "high|medium|low|none",
+    "reason": "why you chose this match"
+  }
+}`
+                }
+              ]
+            }]
+          })
+        });
+
+        const data = await response.json();
+        const text = data.content?.find(b => b.type === "text")?.text || "";
+
+        // 4. Parse JSON response
+        let parsed;
+        try {
+          const clean = text.replace(/```json|```/g, "").trim();
+          parsed = JSON.parse(clean);
+        } catch {
+          parsed = { extracted: { vendor:"?", amount:0, date:"?", notes:"Parse error" }, match: { txId:null, confidence:"low", reason:"Could not parse AI response" } };
+        }
+
+        newExtracted[file.name] = parsed.extracted;
+        if (parsed.match?.txId && parsed.match.confidence !== "none") {
+          newMatches[file.name] = { txId: parsed.match.txId, confidence: parsed.match.confidence, reason: parsed.match.reason };
+        } else {
+          newMatches[file.name] = { txId: null, confidence: "low", reason: parsed.match?.reason || "No match found" };
+        }
+
+      } catch (err) {
+        console.error("Receipt matching error:", err);
+        newExtracted[file.name] = { vendor:"Error", amount:0, date:"?", notes: err.message };
+        newMatches[file.name]   = { txId: null, confidence: "low", reason: "Processing failed" };
+      }
+    }
+
+    setExtracted(newExtracted);
+    setMatches(newMatches);
+    setStatus("done");
+    setCurrent("");
+  };
+
+  const confidenceColor = { high:"var(--green)", medium:"var(--amber)", low:"var(--red)", none:"var(--text3)" };
+
+  return (
     <div className="modal-overlay">
-      <div className="modal-box card" style={{width:"100%",maxWidth:680,maxHeight:"90vh",overflow:"hidden",display:"flex",flexDirection:"column"}}>
+      <div className="modal-box card" style={{width:"100%",maxWidth:740,maxHeight:"90vh",overflow:"hidden",display:"flex",flexDirection:"column"}}>
+
+        {/* Header */}
         <div style={{padding:"20px 24px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div>
             <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>AI Receipt Matching</div>
-            <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{receipts.length} receipts · matched by vendor, amount & date</div>
+            <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>
+              {status==="running" ? `Reading ${current}…` : `${receipts.length} receipt${receipts.length!==1?"s":""} · Claude vision · review and confirm`}
+            </div>
           </div>
           <button className="btn-ghost" onClick={onClose}>✕</button>
         </div>
-        <div style={{overflow:"auto",flex:1,padding:"16px 24px"}}>
-          {receipts.map(r=>{
-            const match=matches[r.name];
-            return(
-              <div key={r.name} style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:12,alignItems:"center",padding:"12px 0",borderBottom:"1px solid var(--border)"}}>
-                <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px"}}>
-                  <div style={{fontSize:12,fontFamily:"var(--mono)",color:"var(--text)",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📄 {r.name}</div>
-                  <div style={{fontSize:11,color:"var(--text3)"}}>{(r.size/1024).toFixed(0)} KB</div>
+
+        {/* Running state */}
+        {status==="running" && (
+          <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:40}}>
+            <div style={{width:40,height:40,border:"3px solid var(--border2)",borderTopColor:"var(--purple)",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:14,fontWeight:600,color:"var(--text)",marginBottom:4}}>Claude is reading your receipts</div>
+              <div style={{fontSize:12,color:"var(--text3)",fontFamily:"var(--mono)"}}>{current}</div>
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:8}}>Extracting vendor · amount · date · finding best match</div>
+            </div>
+          </div>
+        )}
+
+        {/* Results */}
+        {status==="done" && (
+          <div style={{overflow:"auto",flex:1,padding:"16px 24px",display:"flex",flexDirection:"column",gap:16}}>
+            {receipts.map(r => {
+              const match = matches[r.name] || {};
+              const ext   = extracted[r.name] || {};
+              const matchedTx = transactions.find(t => t.id === match.txId);
+              return (
+                <div key={r.name} className="card" style={{padding:16,border:"1px solid var(--border2)"}}>
+
+                  {/* Receipt extracted info */}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+                    <div>
+                      <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>📄 Receipt</div>
+                      <div style={{fontSize:13,fontWeight:600,color:"var(--text)",marginBottom:2}}>{r.name}</div>
+                      <div style={{fontSize:11,color:"var(--text3)"}}>{(r.size/1024).toFixed(0)} KB</div>
+                      {ext.vendor && (
+                        <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:3}}>
+                          <div style={{fontSize:12,color:"var(--text2)"}}>Vendor: <span style={{color:"var(--text)",fontWeight:500}}>{ext.vendor}</span></div>
+                          <div style={{fontSize:12,color:"var(--text2)"}}>Amount: <span style={{color:"var(--text)",fontWeight:500,fontFamily:"var(--mono)"}}>{ext.amount ? fmt(ext.amount) : "?"}</span></div>
+                          <div style={{fontSize:12,color:"var(--text2)"}}>Date: <span style={{color:"var(--text)",fontWeight:500,fontFamily:"var(--mono)"}}>{ext.date||"?"}</span></div>
+                          {ext.notes && <div style={{fontSize:11,color:"var(--text3)",fontStyle:"italic",marginTop:2}}>{ext.notes}</div>}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* AI match result */}
+                    <div>
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                        <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em"}}>⚡ AI Match</div>
+                        {match.confidence && <span style={{fontSize:10,fontWeight:600,color:confidenceColor[match.confidence],background:confidenceColor[match.confidence]+"18",padding:"1px 7px",borderRadius:4,border:"1px solid "+confidenceColor[match.confidence]+"33"}}>{match.confidence}</span>}
+                      </div>
+                      {matchedTx ? (
+                        <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px",border:"1px solid var(--border)"}}>
+                          <div style={{fontSize:13,fontWeight:600,color:"var(--text)",marginBottom:2}}>{matchedTx.vendor}</div>
+                          <div style={{fontSize:11,fontFamily:"var(--mono)",color:"var(--text2)"}}>{fmtDate(matchedTx.date)} · {fmt(matchedTx.amount)}</div>
+                          {match.reason && <div style={{fontSize:11,color:"var(--text3)",marginTop:4,fontStyle:"italic"}}>{match.reason}</div>}
+                        </div>
+                      ) : (
+                        <div style={{background:"var(--red-dim)",borderRadius:8,padding:"10px 12px",border:"1px solid var(--red-border)"}}>
+                          <div style={{fontSize:12,color:"var(--red)",fontWeight:500}}>No match found</div>
+                          {match.reason && <div style={{fontSize:11,color:"var(--red)",opacity:0.8,marginTop:3}}>{match.reason}</div>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Override dropdown */}
+                  <div>
+                    <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>Assign to transaction (override if needed)</div>
+                    <select value={match.txId||""} onChange={e=>setMatches(m=>({...m,[r.name]:{...m[r.name],txId:+e.target.value||null,confidence:"medium"}}))}>
+                      <option value="">— Leave unmapped —</option>
+                      {transactions.map(t=><option key={t.id} value={t.id}>{fmtDate(t.date)} · {t.vendor} · {fmt(t.amount)}</option>)}
+                    </select>
+                  </div>
                 </div>
-                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                  <ConfDot level={match?.confidence}/>
-                  <div style={{fontSize:9,color:"var(--text3)",fontFamily:"var(--mono)"}}>AI</div>
-                </div>
-                <select value={match?.txId||""} onChange={e=>setMatches(m=>({...m,[r.name]:{...m[r.name],txId:+e.target.value}}))}>
-                  <option value="">— Unmapped —</option>
-                  {transactions.map(t=><option key={t.id} value={t.id}>{fmtDate(t.date)} · {t.vendor} · {fmt(t.amount)}</option>)}
-                </select>
-              </div>
-            );
-          })}
-        </div>
-        <div style={{padding:"16px 24px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"flex-end",gap:10}}>
-          <button className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn-primary" onClick={()=>onConfirm(matches)}>Confirm Matches</button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div style={{padding:"16px 24px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+          <div style={{fontSize:11,color:"var(--text3)"}}>
+            {status==="done" && `${Object.values(matches).filter(m=>m.txId).length} of ${receipts.length} matched · unmapped receipts saved for later`}
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button className="btn-secondary" onClick={onClose}>Cancel</button>
+            {status==="done" && <button className="btn-primary" onClick={()=>onConfirm(matches)}>Confirm Matches →</button>}
+            {status==="done" && <button className="btn-ghost" style={{fontSize:12}} onClick={runMatching}>↻ Re-run AI</button>}
+          </div>
         </div>
       </div>
     </div>
@@ -802,9 +979,13 @@ export default function App() {
     r.readAsText(file);
   };
 
+  const [rawFiles,setRawFiles]=useState([]);
+
   const handleRcptFolder=(files)=>{
     const arr=Array.from(files).map(f=>({name:f.name,size:f.size,url:URL.createObjectURL(f)}));
-    setUploadedReceipts(arr);setShowMatcher(true);
+    setUploadedReceipts(arr);
+    setRawFiles(Array.from(files));
+    setShowMatcher(true);
   };
 
   const handleMatchConfirm=(matches)=>{
@@ -1226,7 +1407,7 @@ export default function App() {
       {/* OVERLAYS */}
       {selectedTx&&<TxDrawer tx={selectedTx} glAccounts={glAccounts} currentUser={currentUser} allUsers={users} onUpdate={update} onClose={()=>setSelectedTxId(null)} locked={isCardholder&&stmtLocked}/>}
       {showStmt&&<StatementModal myTxs={myTxs} onConfirm={submitStmt} onClose={()=>setShowStmt(false)}/>}
-      {showMatcher&&<ReceiptMatcher receipts={uploadedReceipts} transactions={isCardholder?myTxs:transactions} onConfirm={handleMatchConfirm} onClose={()=>setShowMatcher(false)}/>}
+      {showMatcher&&<ReceiptMatcher receipts={uploadedReceipts} rawFiles={rawFiles} transactions={isCardholder?myTxs:transactions} onConfirm={handleMatchConfirm} onClose={()=>setShowMatcher(false)}/>}
       {showNS&&<NSModal transactions={transactions} onClose={()=>setShowNS(false)} onDone={handleExportDone}/>}
       {showGL&&<GLSettings glAccounts={glAccounts} onSave={setGlAccounts} onClose={()=>setShowGL(false)}/>}
     </div>
