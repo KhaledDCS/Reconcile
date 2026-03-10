@@ -1,5 +1,6 @@
 // @ts-nocheck
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import * as api from "./lib/api";
 
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
@@ -233,18 +234,16 @@ function ConfDot({ level }) {
 }
 
 // ── LOGIN ─────────────────────────────────────────────────────────────────────
-function LoginPage({ users, onLogin }) {
+function LoginPage({ onLogin }) {
   const [email,setEmail]=useState("");
   const [pw,setPw]=useState("");
   const [err,setErr]=useState("");
   const [loading,setLoading]=useState(false);
 
-  const submit = () => {
+  const submit = async () => {
     setErr(""); setLoading(true);
-    setTimeout(()=>{
-      const u=users.find(u=>u.email===email&&u.password===pw&&u.active);
-      if(u){onLogin(u);}else{setErr("Invalid email or password.");setLoading(false);}
-    },600);
+    const u = await onLogin(email, pw);
+    if(!u){ setErr("Invalid email or password."); setLoading(false); }
   };
 
   return (
@@ -306,10 +305,11 @@ function UserMgmt({ users, onUpdate }) {
   const [form,setForm]=useState({name:"",email:"",password:"",role:"cardholder",card:""});
   const [err,setErr]=useState("");
 
-  const add=()=>{
+  const add=async ()=>{
     if(!form.name||!form.email||!form.password){setErr("Name, email and password are required.");return;}
     if(users.find(u=>u.email===form.email)){setErr("Email already exists.");return;}
-    onUpdate([...users,{...form,id:"u"+Date.now(),active:true,createdAt:new Date().toISOString().slice(0,10)}]);
+    const newUser=await api.createUser(form);
+    onUpdate([...users,{...newUser,createdAt:newUser.created_at}]);
     setForm({name:"",email:"",password:"",role:"cardholder",card:""});setShowAdd(false);setErr("");
   };
 
@@ -338,14 +338,14 @@ function UserMgmt({ users, onUpdate }) {
             </div>
             <div style={{fontSize:12,color:"var(--text2)",fontFamily:"var(--mono)",alignSelf:"center"}}>{u.email}</div>
             <div style={{alignSelf:"center"}}>
-              <select value={u.role} onChange={e=>onUpdate(users.map(x=>x.id===u.id?{...x,role:e.target.value}:x))} style={{fontSize:12,width:"auto"}}>
+              <select value={u.role} onChange={async e=>{await api.updateUser(u.id,{role:e.target.value});onUpdate(users.map(x=>x.id===u.id?{...x,role:e.target.value}:x));}} style={{fontSize:12,width:"auto"}}>
                 <option value="cardholder">Cardholder</option>
                 <option value="reviewer">Reviewer</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
             <div style={{alignSelf:"center"}}>
-              <button className={u.active?"btn-danger":"btn-success"} style={{fontSize:11,padding:"5px 12px"}} onClick={()=>onUpdate(users.map(x=>x.id===u.id?{...x,active:!x.active}:x))}>
+              <button className={u.active?"btn-danger":"btn-success"} style={{fontSize:11,padding:"5px 12px"}} onClick={async ()=>{await api.updateUser(u.id,{active:!u.active});onUpdate(users.map(x=>x.id===u.id?{...x,active:!x.active}:x));}}>
                 {u.active?"Deactivate":"Activate"}
               </button>
             </div>
@@ -705,10 +705,11 @@ function NSModal({ transactions, onClose, onDone }) {
 
 // ── MAIN ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [users,setUsers]=useState(INITIAL_USERS);
+  const [users,setUsers]=useState([]);
   const [currentUser,setCurrentUser]=useState(null);
   const [vendorAssignees,setVendorAssignees]=useState(DEFAULT_VENDOR_ASSIGNEES);
-  const [transactions,setTransactions]=useState(()=>initTx(DEFAULT_VENDOR_ASSIGNEES));
+  const [transactions,setTransactions]=useState([]);
+  const [loading,setLoading]=useState(false);
   const [glAccounts,setGlAccounts]=useState(DEFAULT_GL_ACCOUNTS);
   const [activeTab,setActiveTab]=useState("transactions");
   const [filterStatus,setFilterStatus]=useState("all");
@@ -721,22 +722,60 @@ export default function App() {
   const [showStmt,setShowStmt]=useState(false);
   const [uploadedReceipts,setUploadedReceipts]=useState([]);
   const [showMatcher,setShowMatcher]=useState(false);
+  const [unmappedReceipts,setUnmappedReceipts]=useState([]);
   const [exportHistory,setExportHistory]=useState([]);
   const [stmtStatus,setStmtStatus]=useState({});
   const [csvErr,setCsvErr]=useState("");
   const csvRef=useRef();
   const rcptRef=useRef();
 
+  // ── LOAD FROM DB ON LOGIN ──────────────────────────────────────────────────
+  useEffect(()=>{
+    if(!currentUser)return;
+    setLoading(true);
+    Promise.all([
+      api.getUsers(),
+      api.getTransactions(),
+      api.getExportHistory(),
+      api.getStatementStatuses(),
+    ]).then(([u,t,e,s])=>{
+      setUsers(u);
+      setTransactions(t);
+      setExportHistory(e);
+      setStmtStatus(s);
+      setLoading(false);
+    }).catch(err=>{console.error("DB load error:",err);setLoading(false);});
+  },[currentUser]);
+
   const isAdmin=currentUser?.role==="admin";
   const isReviewer=currentUser?.role==="reviewer"||currentUser?.role==="admin";
   const isCardholder=currentUser?.role==="cardholder";
 
-  const update=useCallback((id,changes)=>setTransactions(prev=>prev.map(t=>t.id===id?{...t,...changes}:t)),[]);
+  const update=useCallback(async (id,changes)=>{
+    // Handle receipt separately
+    if('receipt' in changes){
+      if(changes.receipt){
+        await api.attachReceipt(id,{...changes.receipt,receiptMatch:changes.receiptMatch});
+      } else {
+        await api.removeReceipt(id);
+      }
+    }
+    // Update transaction row in DB
+    await api.updateTransaction(id,changes);
+    // Update local state
+    setTransactions(prev=>prev.map(t=>t.id===id?{...t,...changes}:t));
+  },[]);
   const myTxs=transactions.filter(t=>t.userId===currentUser?.id);
   const myStmt=stmtStatus[currentUser?.id]||"open";
   const stmtLocked=["submitted","approved","exported"].includes(myStmt);
 
-  const submitStmt=()=>{
+  const submitStmt=async ()=>{
+    const period=new Date().toISOString().slice(0,7);
+    const ids=myTxs.filter(t=>t.status==="pending").map(t=>t.id);
+    await Promise.all([
+      api.bulkUpdateStatus(ids,"submitted"),
+      api.setStatementStatus(currentUser.id,period,"submitted"),
+    ]);
     setTransactions(prev=>prev.map(t=>t.userId===currentUser.id&&t.status==="pending"?{...t,status:"submitted"}:t));
     setStmtStatus(s=>({...s,[currentUser.id]:"submitted"}));
     setShowStmt(false);
@@ -769,17 +808,30 @@ export default function App() {
   };
 
   const handleMatchConfirm=(matches)=>{
+    const mapped=new Set();
     setTransactions(prev=>prev.map(t=>{
       const match=Object.entries(matches).find(([,v])=>v.txId===t.id);
       if(!match)return t;
       const r=uploadedReceipts.find(r=>r.name===match[0]);
+      if(r)mapped.add(r.name);
       return r?{...t,receipt:{name:r.name,size:r.size,url:r.url},receiptMatch:match[1].confidence}:t;
     }));
+    // persist receipts that were left unmapped
+    const leftover=uploadedReceipts.filter(r=>!mapped.has(r.name));
+    setUnmappedReceipts(prev=>{const names=new Set(prev.map(x=>x.name));return [...prev,...leftover.filter(x=>!names.has(x.name))];});
     setShowMatcher(false);
   };
 
-  const handleExportDone=(record)=>{
+  const handleExportDone=async (record)=>{
     const full={...record,exportedBy:currentUser.name};
+    await Promise.all([
+      api.saveExportRecord(full),
+      api.bulkUpdateStatus(
+        transactions.filter(t=>t.status==="approved").map(t=>t.id),
+        "exported",
+        full.reconId
+      ),
+    ]);
     setExportHistory(prev=>[full,...prev]);
     setTransactions(prev=>prev.map(t=>t.status==="approved"?{...t,status:"exported",reconId:full.reconId}:t));
   };
@@ -809,10 +861,24 @@ export default function App() {
   const totalAmt=vis.reduce((s,t)=>s+t.amount,0);
   const selectedTx=transactions.find(t=>t.id===selectedTxId);
 
-  if(!currentUser)return <LoginPage users={users} onLogin={setCurrentUser}/>;
+  const handleLogin=async (email,pw)=>{
+    const u=await api.loginUser(email,pw);
+    if(u)setCurrentUser({...u,role:u.role,name:u.name,id:u.id,card:u.card});
+    return u;
+  };
+
+  if(!currentUser)return <LoginPage onLogin={handleLogin}/>;
+  if(loading)return(
+    <div style={{minHeight:"100vh",background:"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}>
+      <style>{CSS}</style>
+      <div style={{width:36,height:36,border:"3px solid var(--border2)",borderTopColor:"var(--accent)",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+      <div style={{fontSize:13,color:"var(--text3)"}}>Loading your data…</div>
+    </div>
+  );;
 
   const tabs=isCardholder?["transactions","receipts"]:isAdmin?["transactions","receipts","users","settings"]:["transactions","receipts","settings"];
-  const tabLabel={transactions:"Transactions",receipts:"Receipts"+(uploadedReceipts.length>0?" ("+uploadedReceipts.length+")":""),users:"Users",settings:"Settings"};
+  const totalRcptBadge=unmappedReceipts.length+uploadedReceipts.length;
+  const tabLabel={transactions:"Transactions",receipts:"Receipts"+(unmappedReceipts.length>0?" ("+unmappedReceipts.length+" unmapped)":""),users:"Users",settings:"Settings"};
 
   return(
     <div style={{minHeight:"100vh",background:"var(--bg)"}}>
@@ -995,6 +1061,42 @@ export default function App() {
               </div>
               <input ref={rcptRef} type="file" accept="image/*,application/pdf" multiple style={{display:"none"}} onChange={e=>handleRcptFolder(e.target.files)}/>
             </div>
+            {/* Unmapped receipts holding area */}
+            {unmappedReceipts.length>0&&(
+              <div className="card" style={{overflow:"hidden",marginBottom:20,border:"1px solid var(--amber-border)"}}>
+                <div style={{padding:"12px 16px",background:"var(--amber-dim)",borderBottom:"1px solid var(--amber-border)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:13}}>📥</span>
+                    <span style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--amber)"}}>Unmapped Receipts ({unmappedReceipts.length})</span>
+                  </div>
+                  <span style={{fontSize:11,color:"var(--amber)"}}>Assign each receipt to a transaction below</span>
+                </div>
+                {unmappedReceipts.map(r=>(
+                  <div key={r.name} style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:12,alignItems:"center",padding:"12px 16px",borderBottom:"1px solid var(--border)"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:20}}>📄</span>
+                      <div>
+                        <div style={{fontSize:12,fontFamily:"var(--mono)",color:"var(--text)",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:200}}>{r.name}</div>
+                        <div style={{fontSize:11,color:"var(--text3)"}}>{(r.size/1024).toFixed(0)} KB</div>
+                      </div>
+                    </div>
+                    <select defaultValue="" onChange={e=>{
+                      const txId=+e.target.value;
+                      if(!txId)return;
+                      update(txId,{receipt:{name:r.name,size:r.size,url:r.url},receiptMatch:null});
+                      setUnmappedReceipts(prev=>prev.filter(x=>x.name!==r.name));
+                    }} style={{fontSize:12}}>
+                      <option value="">— Assign to transaction —</option>
+                      {(isCardholder?myTxs:transactions).filter(t=>!t.receipt).map(t=>(
+                        <option key={t.id} value={t.id}>{fmtDate(t.date)} · {t.vendor} · {fmt(t.amount)}</option>
+                      ))}
+                    </select>
+                    <button className="btn-ghost" style={{color:"var(--red)",fontSize:12,padding:"4px 8px"}} onClick={()=>setUnmappedReceipts(prev=>prev.filter(x=>x.name!==r.name))} title="Discard receipt">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="card" style={{overflow:"hidden"}}>
               <div style={{padding:"12px 16px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em"}}>Receipt Status · All Transactions</div>
               {(isCardholder?myTxs:transactions).map(t=>(
