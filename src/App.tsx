@@ -254,7 +254,7 @@ function LoginPage({ onLogin }) {
 
   const submit = async () => {
     setErr(""); setLoading(true);
-    const u = await onLogin(email, pw);
+    const u = await onLogin(email.trim().toLowerCase(), pw);
     if(!u){ setErr("Invalid email or password."); setLoading(false); }
   };
 
@@ -280,11 +280,11 @@ function LoginPage({ onLogin }) {
           <div style={{display:"flex",flexDirection:"column",gap:14,marginBottom:18}}>
             <div className="input-group">
               <label className="input-label">Email address</label>
-              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@company.com" onKeyDown={e=>e.key==="Enter"&&submit()} />
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@company.com" onKeyDown={e=>e.key==="Enter"&&submit()} autoComplete="email"/>
             </div>
             <div className="input-group">
               <label className="input-label">Password</label>
-              <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="••••••••" onKeyDown={e=>e.key==="Enter"&&submit()} />
+              <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="••••••••" onKeyDown={e=>e.key==="Enter"&&submit()} autoComplete="current-password"/>
             </div>
           </div>
           {err&&<div className="alert-error" style={{marginBottom:14}}>⚠ {err}</div>}
@@ -292,19 +292,105 @@ function LoginPage({ onLogin }) {
             {loading&&<span style={{width:15,height:15,border:"2px solid white",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/>}
             {loading?"Signing in...":"Sign in →"}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-          <div style={{marginTop:20,paddingTop:20,borderTop:"1px solid var(--border)"}}>
-            <div style={{fontSize:10,color:"var(--text3)",fontFamily:"var(--mono)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Quick login — demo accounts</div>
-            <div style={{display:"flex",flexDirection:"column",gap:6}}>
-              {[{label:"Admin",email:"admin@company.com",pw:"admin123"},{label:"Cardholder",email:"jordan@company.com",pw:"pass123"},{label:"Reviewer",email:"sam@company.com",pw:"pass123"}].map(d=>(
-                <button key={d.email} onClick={()=>{setEmail(d.email);setPw(d.pw);}}
-                  style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,fontSize:12,color:"var(--text2)"}}>
-                  <span style={{color:"var(--text)",fontWeight:600}}>{d.label}</span>
-                  <span style={{fontFamily:"var(--mono)",fontSize:11}}>{d.email}</span>
-                </button>
-              ))}
-            </div>
+// ── ACCOUNT SETTINGS MODAL ───────────────────────────────────────────────────
+function AccountSettingsModal({ currentUser, onClose, onPasswordChanged }) {
+  const [currentPw,setCurrentPw]=useState("");
+  const [newPw,setNewPw]=useState("");
+  const [confirmPw,setConfirmPw]=useState("");
+  const [err,setErr]=useState("");
+  const [success,setSuccess]=useState(false);
+  const [saving,setSaving]=useState(false);
+
+  // Password strength: min 6 chars + at least one special character
+  const SPECIAL = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/;
+  const sanitize = (s) => s.replace(/[<>"'`;]/g,""); // strip injection chars
+
+  const validate = () => {
+    if(!currentPw||!newPw||!confirmPw){ setErr("All fields are required."); return false; }
+    if(newPw.length < 6){ setErr("Password must be at least 6 characters."); return false; }
+    if(!SPECIAL.test(newPw)){ setErr("Password must contain at least one special character (!@#$%^&* etc.)."); return false; }
+    if(newPw !== confirmPw){ setErr("New passwords do not match."); return false; }
+    if(newPw === currentPw){ setErr("New password must be different from current password."); return false; }
+    return true;
+  };
+
+  const save = async () => {
+    setErr(""); setSuccess(false);
+    if(!validate()) return;
+    setSaving(true);
+    try {
+      // Verify current password matches DB
+      const u = await api.loginUser(currentUser.email, currentPw);
+      if(!u){ setErr("Current password is incorrect."); setSaving(false); return; }
+      // Save sanitized new password
+      await api.updateUser(currentUser.id, { password: sanitize(newPw) });
+      setSuccess(true);
+      setCurrentPw(""); setNewPw(""); setConfirmPw("");
+      onPasswordChanged();
+    } catch(e) {
+      setErr("Failed to update password. Please try again.");
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-box card" style={{width:"100%",maxWidth:420,padding:28}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>Account Settings</div>
+            <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{currentUser.name} · {currentUser.email}</div>
           </div>
+          <button className="btn-ghost" onClick={onClose}>✕</button>
+        </div>
+
+        <div style={{fontSize:13,fontWeight:600,color:"var(--text)",marginBottom:14}}>Change Password</div>
+        <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:16}}>
+          <div className="input-group">
+            <label className="input-label">Current Password</label>
+            <input type="password" value={currentPw} onChange={e=>setCurrentPw(e.target.value)} placeholder="••••••••" autoComplete="current-password"/>
+          </div>
+          <div className="input-group">
+            <label className="input-label">New Password</label>
+            <input type="password" value={newPw} onChange={e=>setNewPw(e.target.value)} placeholder="Min 6 chars + special character" autoComplete="new-password"/>
+            {newPw.length>0&&(
+              <div style={{marginTop:6,display:"flex",gap:8,flexWrap:"wrap"}}>
+                <span style={{fontSize:10,color:newPw.length>=6?"var(--green)":"var(--red)"}}>
+                  {newPw.length>=6?"✓":"✗"} 6+ characters
+                </span>
+                <span style={{fontSize:10,color:SPECIAL.test(newPw)?"var(--green)":"var(--red)"}}>
+                  {SPECIAL.test(newPw)?"✓":"✗"} Special character
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="input-group">
+            <label className="input-label">Confirm New Password</label>
+            <input type="password" value={confirmPw} onChange={e=>setConfirmPw(e.target.value)} placeholder="••••••••" autoComplete="new-password"/>
+            {confirmPw.length>0&&(
+              <div style={{marginTop:6}}>
+                <span style={{fontSize:10,color:newPw===confirmPw?"var(--green)":"var(--red)"}}>
+                  {newPw===confirmPw?"✓ Passwords match":"✗ Passwords do not match"}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {err&&<div className="alert-error" style={{marginBottom:14}}>⚠ {err}</div>}
+        {success&&<div className="alert-success" style={{marginBottom:14}}>✓ Password updated successfully.</div>}
+
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+          <button className="btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn-primary" onClick={save} disabled={saving||!currentPw||!newPw||!confirmPw}>
+            {saving?"Saving…":"Update Password"}
+          </button>
         </div>
       </div>
     </div>
@@ -1096,6 +1182,8 @@ export default function App() {
   const [selectedTxId,setSelectedTxId]=useState(null);
   const [showNS,setShowNS]=useState(false);
   const [showStmt,setShowStmt]=useState(false);
+  const [showAccountSettings,setShowAccountSettings]=useState(false);
+  const [showUserMenu,setShowUserMenu]=useState(false);
   const [uploadedReceipts,setUploadedReceipts]=useState([]);
   const [showMatcher,setShowMatcher]=useState(false);
   const [unmappedReceipts,setUnmappedReceipts]=useState([]);
@@ -1109,12 +1197,13 @@ export default function App() {
   useEffect(()=>{
     if(!currentUser)return;
     setLoading(true);
+    const getCards = api.getCards || (()=>Promise.resolve([]));
     Promise.all([
       api.getUsers(),
       api.getTransactions(),
       api.getExportHistory(),
       api.getStatementStatuses(),
-      api.getCards(),
+      getCards(),
     ]).then(([u,t,e,s,c])=>{
       setUsers(u);
       setTransactions(t);
@@ -1268,13 +1357,29 @@ export default function App() {
             {isAdmin&&counts.approved>0&&(
               <button className="btn-primary" style={{fontSize:12,padding:"7px 14px"}} onClick={()=>setShowNS(true)}>Export to NetSuite →</button>
             )}
-            <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 12px",background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)",cursor:"pointer"}} onClick={()=>setCurrentUser(null)}>
-              <Av name={currentUser.name} color={ROLE_COLOR[currentUser.role]} size={22}/>
-              <div>
-                <div style={{fontSize:12,fontWeight:600,color:"var(--text)",lineHeight:1.2}}>{currentUser.name}</div>
-                <div style={{fontSize:10,color:"var(--text3)",lineHeight:1.2}}>{ROLE_LABEL[currentUser.role]}</div>
+            <div style={{position:"relative"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 12px",background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)",cursor:"pointer",userSelect:"none"}} onClick={()=>setShowUserMenu(v=>!v)}>
+                <Av name={currentUser.name} color={ROLE_COLOR[currentUser.role]} size={22}/>
+                <div>
+                  <div style={{fontSize:12,fontWeight:600,color:"var(--text)",lineHeight:1.2}}>{currentUser.name}</div>
+                  <div style={{fontSize:10,color:"var(--text3)",lineHeight:1.2}}>{ROLE_LABEL[currentUser.role]}</div>
+                </div>
+                <span style={{fontSize:10,color:"var(--text3)",marginLeft:2}}>▾</span>
               </div>
-              <span style={{fontSize:10,color:"var(--text3)",marginLeft:2}}>↩</span>
+              {showUserMenu&&(
+                <>
+                  <div style={{position:"fixed",inset:0,zIndex:98}} onClick={()=>setShowUserMenu(false)}/>
+                  <div style={{position:"absolute",right:0,top:"calc(100% + 6px)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:6,minWidth:180,zIndex:99,boxShadow:"var(--shadow)"}}>
+                    <button className="btn-ghost" style={{width:"100%",textAlign:"left",padding:"8px 12px",fontSize:13,borderRadius:6}} onClick={()=>{setShowUserMenu(false);setShowAccountSettings(true);}}>
+                      ⚙ Account Settings
+                    </button>
+                    <div style={{height:1,background:"var(--border)",margin:"4px 0"}}/>
+                    <button className="btn-ghost" style={{width:"100%",textAlign:"left",padding:"8px 12px",fontSize:13,borderRadius:6,color:"var(--red)"}} onClick={()=>{setShowUserMenu(false);setCurrentUser(null);}}>
+                      ↩ Sign out
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1589,6 +1694,7 @@ export default function App() {
       </div>
 
       {/* OVERLAYS */}
+      {showAccountSettings&&<AccountSettingsModal currentUser={currentUser} onClose={()=>setShowAccountSettings(false)} onPasswordChanged={()=>setTimeout(()=>setShowAccountSettings(false),1500)}/>}
       {selectedTx&&<TxDrawer tx={selectedTx} currentUser={currentUser} allUsers={users} onUpdate={update} onClose={()=>setSelectedTxId(null)} locked={isUser&&stmtLocked}/>}
       {showStmt&&<StatementModal myTxs={myTxs} onConfirm={submitStmt} onClose={()=>setShowStmt(false)}/>}
       {showMatcher&&<ReceiptMatcher receipts={uploadedReceipts} rawFiles={rawFiles} transactions={isUser?myTxs:transactions} onConfirm={handleMatchConfirm} onClose={()=>setShowMatcher(false)}/>}
