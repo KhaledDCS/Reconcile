@@ -1348,7 +1348,7 @@ function NSModal({ transactions, onClose, onDone }) {
 // ── MAIN ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const [users,setUsers]=useState([]);
-  const [currentUser,setCurrentUser]=useState(null);
+  const [currentUser,setCurrentUser]=useState(()=>{try{const s=localStorage.getItem("recon_session");return s?JSON.parse(s):null;}catch(e){return null;}});
   const [vendorAssignees,setVendorAssignees]=useState(DEFAULT_VENDOR_ASSIGNEES);
   const [transactions,setTransactions]=useState([]);
   const [loading,setLoading]=useState(false);
@@ -1496,7 +1496,11 @@ export default function App() {
 
   const handleLogin=async (email,pw)=>{
     const u=await api.loginUser(email,pw);
-    if(u)setCurrentUser({...u,role:u.role,name:u.name,id:u.id,card:u.card});
+    if(u){
+      const session={...u,role:u.role,name:u.name,id:u.id,card:u.card};
+      setCurrentUser(session);
+      try{localStorage.setItem("recon_session",JSON.stringify(session));}catch(e){}
+    }
     return u;
   };
 
@@ -1555,7 +1559,7 @@ export default function App() {
                       ⚙ Account Settings
                     </button>
                     <div style={{height:1,background:"var(--border)",margin:"4px 0"}}/>
-                    <button className="btn-ghost" style={{width:"100%",textAlign:"left",padding:"8px 12px",fontSize:13,borderRadius:4,color:"var(--red)"}} onClick={()=>{setShowUserMenu(false);setCurrentUser(null);}}>
+                    <button className="btn-ghost" style={{width:"100%",textAlign:"left",padding:"8px 12px",fontSize:13,borderRadius:4,color:"var(--red)"}} onClick={()=>{setShowUserMenu(false);try{localStorage.removeItem("recon_session");}catch(e){}setCurrentUser(null);}}>
                       ↩ Sign out
                     </button>
                   </div>
