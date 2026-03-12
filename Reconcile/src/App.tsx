@@ -398,86 +398,17 @@ function AccountSettingsModal({ currentUser, onClose, onPasswordChanged }) {
 }
 
 // ── USER MANAGEMENT ───────────────────────────────────────────────────────────
-const SPECIAL_RE = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/;
-const sanitizeInput = s => String(s).replace(/[<>"'`;]/g,"").trim();
-
 function UserMgmt({ users, onUpdate }) {
   const [showAdd,setShowAdd]=useState(false);
   const [form,setForm]=useState({name:"",email:"",password:"",role:"user",card:""});
-  const [addErr,setAddErr]=useState("");
-  const [editId,setEditId]=useState(null);
-  const [editForm,setEditForm]=useState({});
-  const [editErr,setEditErr]=useState("");
-  const [resetId,setResetId]=useState(null);
-  const [resetPw,setResetPw]=useState("");
-  const [resetErr,setResetErr]=useState("");
-  const [resetOk,setResetOk]=useState(false);
-  const [deleteId,setDeleteId]=useState(null);
-  const [saving,setSaving]=useState(false);
+  const [err,setErr]=useState("");
 
-  const validatePw = pw => {
-    if(pw.length < 6) return "Password must be at least 6 characters.";
-    if(!SPECIAL_RE.test(pw)) return "Password must contain a special character.";
-    return null;
-  };
-
-  const add = async () => {
-    if(!form.name||!form.email||!form.password){setAddErr("Name, email and password required.");return;}
-    const pwErr = validatePw(form.password);
-    if(pwErr){setAddErr(pwErr);return;}
-    if(users.find(u=>u.email===form.email.toLowerCase())){setAddErr("Email already exists.");return;}
-    setSaving(true);
-    try{
-      const newUser = await api.createUser({
-        name: sanitizeInput(form.name),
-        email: sanitizeInput(form.email).toLowerCase(),
-        password: sanitizeInput(form.password),
-        role: form.role,
-        card: sanitizeInput(form.card),
-      });
-      onUpdate([...users,{...newUser,createdAt:newUser.created_at}]);
-      setForm({name:"",email:"",password:"",role:"user",card:""});
-      setShowAdd(false);setAddErr("");
-    }catch(e){setAddErr("Failed to create user.");}
-    setSaving(false);
-  };
-
-  const saveEdit = async () => {
-    if(!editForm.name||!editForm.email){setEditErr("Name and email required.");return;}
-    setSaving(true);
-    try{
-      await api.updateUser(editId,{
-        name: sanitizeInput(editForm.name),
-        email: sanitizeInput(editForm.email).toLowerCase(),
-        role: editForm.role,
-        card: sanitizeInput(editForm.card||""),
-      });
-      onUpdate(users.map(u=>u.id===editId?{...u,...editForm,email:sanitizeInput(editForm.email).toLowerCase()}:u));
-      setEditId(null);setEditErr("");
-    }catch(e){setEditErr("Failed to save.");}
-    setSaving(false);
-  };
-
-  const resetPassword = async () => {
-    const pwErr = validatePw(resetPw);
-    if(pwErr){setResetErr(pwErr);return;}
-    setSaving(true);
-    try{
-      await api.updateUser(resetId,{password:sanitizeInput(resetPw)});
-      setResetOk(true);setResetErr("");
-      setTimeout(()=>{setResetId(null);setResetPw("");setResetOk(false);},1500);
-    }catch(e){setResetErr("Failed to reset password.");}
-    setSaving(false);
-  };
-
-  const deleteUser = async () => {
-    setSaving(true);
-    try{
-      await api.updateUser(deleteId,{active:false});
-      onUpdate(users.map(u=>u.id===deleteId?{...u,active:false}:u));
-      setDeleteId(null);
-    }catch(e){}
-    setSaving(false);
+  const add=async ()=>{
+    if(!form.name||!form.email||!form.password){setErr("Name, email and password are required.");return;}
+    if(users.find(u=>u.email===form.email)){setErr("Email already exists.");return;}
+    const newUser=await api.createUser(form);
+    onUpdate([...users,{...newUser,createdAt:newUser.created_at}]);
+    setForm({name:"",email:"",password:"",role:"user",card:""});setShowAdd(false);setErr("");
   };
 
   return (
@@ -491,46 +422,40 @@ function UserMgmt({ users, onUpdate }) {
       </div>
 
       <div className="card" style={{overflow:"hidden"}}>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 110px 100px",padding:"10px 16px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em"}}>
-          <span>User</span><span>Email</span><span>Role</span><span style={{textAlign:"right"}}>Actions</span>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 120px 120px",padding:"10px 16px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em"}}>
+          <span>User</span><span>Email</span><span>Role</span><span>Status</span>
         </div>
         {users.map(u=>(
-          <div key={u.id} className="user-row" style={{display:"grid",gridTemplateColumns:"1fr 1fr 110px 100px",opacity:u.active?1:0.45}}>
+          <div key={u.id} className="user-row" style={{display:"grid",gridTemplateColumns:"1fr 1fr 120px 120px",opacity:u.active?1:0.45}}>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <Av name={u.name} color={ROLE_COLOR[u.role]} size={32}/>
               <div>
                 <div style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{u.name}</div>
-                <div style={{display:"flex",gap:6,alignItems:"center",marginTop:2}}>
-                  {u.card&&<span style={{fontSize:11,color:"var(--text3)",fontFamily:"var(--mono)"}}>{u.card}</span>}
-                  {!u.active&&<span className="tag tag-red" style={{fontSize:9}}>Inactive</span>}
-                </div>
+                {u.card&&<div style={{fontSize:11,color:"var(--text3)",fontFamily:"var(--mono)"}}>{u.card}</div>}
               </div>
             </div>
-            <div style={{fontSize:12,color:"var(--text2)",fontFamily:"var(--mono)",alignSelf:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email}</div>
+            <div style={{fontSize:12,color:"var(--text2)",fontFamily:"var(--mono)",alignSelf:"center"}}>{u.email}</div>
             <div style={{alignSelf:"center"}}>
-              <RoleTag role={u.role}/>
+              <select value={u.role} onChange={async e=>{await api.updateUser(u.id,{role:e.target.value});onUpdate(users.map(x=>x.id===u.id?{...x,role:e.target.value}:x));}} style={{fontSize:12,width:"auto"}}>
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
             </div>
-            <div style={{alignSelf:"center",display:"flex",gap:6,justifyContent:"flex-end"}}>
-              <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px"}} title="Edit user" onClick={()=>{setEditId(u.id);setEditForm({name:u.name,email:u.email,role:u.role,card:u.card||""});}}>✎</button>
-              <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px"}} title="Reset password" onClick={()=>{setResetId(u.id);setResetPw("");setResetErr("");setResetOk(false);}}>🔑</button>
-              <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px",color:u.active?"var(--red)":"var(--green)"}} title={u.active?"Deactivate":"Activate"} onClick={async()=>{await api.updateUser(u.id,{active:!u.active});onUpdate(users.map(x=>x.id===u.id?{...x,active:!x.active}:x));}}>
-                {u.active?"⊘":"✓"}
+            <div style={{alignSelf:"center"}}>
+              <button className={u.active?"btn-danger":"btn-success"} style={{fontSize:11,padding:"5px 12px"}} onClick={async ()=>{await api.updateUser(u.id,{active:!u.active});onUpdate(users.map(x=>x.id===u.id?{...x,active:!x.active}:x));}}>
+                {u.active?"Deactivate":"Activate"}
               </button>
             </div>
           </div>
         ))}
       </div>
 
-      {/* ADD USER MODAL */}
       {showAdd&&(
         <div className="modal-overlay">
           <div className="modal-box card" style={{width:"100%",maxWidth:440,padding:28}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>Add New User</div>
-              <button className="btn-ghost" onClick={()=>{setShowAdd(false);setAddErr("");}}>✕</button>
-            </div>
+            <div style={{fontSize:16,fontWeight:700,color:"var(--text)",marginBottom:20}}>Add New User</div>
             <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:18}}>
-              {[{l:"Full Name",k:"name",t:"text",p:"Jane Smith"},{l:"Email",k:"email",t:"email",p:"jane@company.com"},{l:"Password",k:"password",t:"password",p:"Min 6 chars + special character"},{l:"Card (optional)",k:"card",t:"text",p:"Visa ••1234"}].map(f=>(
+              {[{l:"Full Name",k:"name",t:"text",p:"Jane Smith"},{l:"Email",k:"email",t:"email",p:"jane@company.com"},{l:"Password",k:"password",t:"password",p:"Temporary password"},{l:"Card (optional)",k:"card",t:"text",p:"Visa ••1234"}].map(f=>(
                 <div key={f.k} className="input-group">
                   <label className="input-label">{f.l}</label>
                   <input type={f.t} value={form[f.k]} placeholder={f.p} onChange={e=>setForm(p=>({...p,[f.k]:e.target.value}))}/>
@@ -544,77 +469,10 @@ function UserMgmt({ users, onUpdate }) {
                 </select>
               </div>
             </div>
-            {addErr&&<div className="alert-error" style={{marginBottom:14}}>⚠ {addErr}</div>}
+            {err&&<div className="alert-error" style={{marginBottom:14}}>{err}</div>}
             <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-              <button className="btn-secondary" onClick={()=>{setShowAdd(false);setAddErr("");}}>Cancel</button>
-              <button className="btn-primary" onClick={add} disabled={saving}>{saving?"Saving…":"Create User"}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* EDIT USER MODAL */}
-      {editId&&(
-        <div className="modal-overlay">
-          <div className="modal-box card" style={{width:"100%",maxWidth:440,padding:28}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>Edit User</div>
-              <button className="btn-ghost" onClick={()=>{setEditId(null);setEditErr("");}}>✕</button>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:18}}>
-              {[{l:"Full Name",k:"name",t:"text"},{l:"Email",k:"email",t:"email"},{l:"Card (optional)",k:"card",t:"text",p:"Visa ••1234"}].map(f=>(
-                <div key={f.k} className="input-group">
-                  <label className="input-label">{f.l}</label>
-                  <input type={f.t} value={editForm[f.k]||""} placeholder={f.p||""} onChange={e=>setEditForm(p=>({...p,[f.k]:e.target.value}))}/>
-                </div>
-              ))}
-              <div className="input-group">
-                <label className="input-label">Role</label>
-                <select value={editForm.role} onChange={e=>setEditForm(p=>({...p,role:e.target.value}))}>
-                  <option value="user">User</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-            </div>
-            {editErr&&<div className="alert-error" style={{marginBottom:14}}>⚠ {editErr}</div>}
-            <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-              <button className="btn-secondary" onClick={()=>{setEditId(null);setEditErr("");}}>Cancel</button>
-              <button className="btn-primary" onClick={saveEdit} disabled={saving}>{saving?"Saving…":"Save Changes"}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* RESET PASSWORD MODAL */}
-      {resetId&&(
-        <div className="modal-overlay">
-          <div className="modal-box card" style={{width:"100%",maxWidth:400,padding:28}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <div>
-                <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>Reset Password</div>
-                <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{users.find(u=>u.id===resetId)?.name}</div>
-              </div>
-              <button className="btn-ghost" onClick={()=>{setResetId(null);setResetPw("");setResetErr("");setResetOk(false);}}>✕</button>
-            </div>
-            <div className="input-group" style={{marginBottom:8}}>
-              <label className="input-label">New Password</label>
-              <input type="password" value={resetPw} onChange={e=>setResetPw(e.target.value)} placeholder="Min 6 chars + special character" autoComplete="new-password"/>
-            </div>
-            {resetPw.length>0&&(
-              <div style={{display:"flex",gap:10,marginBottom:12}}>
-                <span style={{fontSize:10,color:resetPw.length>=6?"var(--green)":"var(--red)"}}>
-                  {resetPw.length>=6?"✓":"✗"} 6+ characters
-                </span>
-                <span style={{fontSize:10,color:SPECIAL_RE.test(resetPw)?"var(--green)":"var(--red)"}}>
-                  {SPECIAL_RE.test(resetPw)?"✓":"✗"} Special character
-                </span>
-              </div>
-            )}
-            {resetErr&&<div className="alert-error" style={{marginBottom:14}}>⚠ {resetErr}</div>}
-            {resetOk&&<div className="alert-success" style={{marginBottom:14}}>✓ Password reset successfully.</div>}
-            <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-              <button className="btn-secondary" onClick={()=>{setResetId(null);setResetPw("");}}>Cancel</button>
-              <button className="btn-primary" onClick={resetPassword} disabled={saving||!resetPw}>{saving?"Saving…":"Reset Password"}</button>
+              <button className="btn-secondary" onClick={()=>{setShowAdd(false);setErr("");}}>Cancel</button>
+              <button className="btn-primary" onClick={add}>Create User</button>
             </div>
           </div>
         </div>
@@ -695,8 +553,8 @@ function ReceiptMatcher({ receipts, rawFiles, transactions, onConfirm, onClose }
           `ID:${t.id} | ${fmtDate(t.date)} | ${t.vendor} | ${fmt(t.amount)}`
         ).join("\n");
 
-        // 3. Call Claude vision API via secure server proxy
-        const response = await fetch("/api/claude", {
+        // 3. Call Claude vision API
+        const response = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
