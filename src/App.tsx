@@ -121,29 +121,29 @@ const CATEGORIES = [
 ];
 
 const GL_RULES_DATA = {
-  "amazon web services": { gl:"cat-08", glName:"Hosting COGS",                dept:"IT"                    },
-  "aws":                 { gl:"cat-08", glName:"Hosting COGS",                dept:"IT"                    },
-  "slack":               { gl:"cat-07", glName:"Software Expense",            dept:"General & Administration" },
-  "zoom":                { gl:"cat-07", glName:"Software Expense",            dept:"General & Administration" },
-  "google":              { gl:"cat-07", glName:"Software Expense",            dept:"IT"                    },
-  "microsoft":           { gl:"cat-07", glName:"Software Expense",            dept:"IT"                    },
-  "openai":              { gl:"cat-07", glName:"Software Expense",            dept:"Research & Development" },
-  "salesforce":          { gl:"cat-09", glName:"Marketing and Sales Expense", dept:"Sales"                 },
-  "delta":               { gl:"cat-02", glName:"Airfare",                     dept:"General & Administration" },
-  "united airlines":     { gl:"cat-02", glName:"Airfare",                     dept:"General & Administration" },
-  "marriott":            { gl:"cat-03", glName:"Lodging",                     dept:"General & Administration" },
-  "hilton":              { gl:"cat-03", glName:"Lodging",                     dept:"General & Administration" },
-  "airbnb":              { gl:"cat-03", glName:"Lodging",                     dept:"General & Administration" },
-  "uber":                { gl:"cat-01", glName:"Transportation",              dept:"General & Administration" },
-  "lyft":                { gl:"cat-01", glName:"Transportation",              dept:"General & Administration" },
-  "doordash":            { gl:"cat-06", glName:"Meals",                       dept:"General & Administration" },
-  "grubhub":             { gl:"cat-06", glName:"Meals",                       dept:"General & Administration" },
-  "amazon.com":          { gl:"cat-04", glName:"Office Expense",              dept:"Operations"            },
-  "amazon":              { gl:"cat-04", glName:"Office Expense",              dept:"Operations"            },
-  "staples":             { gl:"cat-04", glName:"Office Expense",              dept:"Operations"            },
-  "fedex":               { gl:"cat-04", glName:"Office Expense",              dept:"Operations"            },
-  "ups":                 { gl:"cat-04", glName:"Office Expense",              dept:"Operations"            },
-  "linkedin":            { gl:"cat-09", glName:"Marketing and Sales Expense", dept:"Sales & Marketing"     },
+  "amazon web services": { categoryId:"cat-08", categoryName:"Hosting COGS",                dept:"IT"                    },
+  "aws":                 { categoryId:"cat-08", categoryName:"Hosting COGS",                dept:"IT"                    },
+  "slack":               { categoryId:"cat-07", categoryName:"Software Expense",            dept:"General & Administration" },
+  "zoom":                { categoryId:"cat-07", categoryName:"Software Expense",            dept:"General & Administration" },
+  "google":              { categoryId:"cat-07", categoryName:"Software Expense",            dept:"IT"                    },
+  "microsoft":           { categoryId:"cat-07", categoryName:"Software Expense",            dept:"IT"                    },
+  "openai":              { categoryId:"cat-07", categoryName:"Software Expense",            dept:"Research & Development" },
+  "salesforce":          { categoryId:"cat-09", categoryName:"Marketing and Sales Expense", dept:"Sales"                 },
+  "delta":               { categoryId:"cat-02", categoryName:"Airfare",                     dept:"General & Administration" },
+  "united airlines":     { categoryId:"cat-02", categoryName:"Airfare",                     dept:"General & Administration" },
+  "marriott":            { categoryId:"cat-03", categoryName:"Lodging",                     dept:"General & Administration" },
+  "hilton":              { categoryId:"cat-03", categoryName:"Lodging",                     dept:"General & Administration" },
+  "airbnb":              { categoryId:"cat-03", categoryName:"Lodging",                     dept:"General & Administration" },
+  "uber":                { categoryId:"cat-01", categoryName:"Transportation",              dept:"General & Administration" },
+  "lyft":                { categoryId:"cat-01", categoryName:"Transportation",              dept:"General & Administration" },
+  "doordash":            { categoryId:"cat-06", categoryName:"Meals",                       dept:"General & Administration" },
+  "grubhub":             { categoryId:"cat-06", categoryName:"Meals",                       dept:"General & Administration" },
+  "amazon.com":          { categoryId:"cat-04", categoryName:"Office Expense",              dept:"Operations"            },
+  "amazon":              { categoryId:"cat-04", categoryName:"Office Expense",              dept:"Operations"            },
+  "staples":             { categoryId:"cat-04", categoryName:"Office Expense",              dept:"Operations"            },
+  "fedex":               { categoryId:"cat-04", categoryName:"Office Expense",              dept:"Operations"            },
+  "ups":                 { categoryId:"cat-04", categoryName:"Office Expense",              dept:"Operations"            },
+  "linkedin":            { categoryId:"cat-09", categoryName:"Marketing and Sales Expense", dept:"Sales & Marketing"     },
 };
 
 const DEFAULT_GL_ACCOUNTS = CATEGORIES;
@@ -198,7 +198,7 @@ const genReconId = () => `RECON-${new Date().getFullYear()}-${String(_seq++).pad
 function autoAssign(vendor) {
   const v = vendor.toLowerCase();
   for (const [k,val] of Object.entries(GL_RULES_DATA)) { if (v.includes(k)) return {...val, confidence:"high", autoAssigned:true}; }
-  return { gl:"cat-04", glName:"Office Expense", dept:"General & Administration", confidence:"low", autoAssigned:true };
+  return { categoryId:"cat-04", categoryName:"Office Expense", dept:"General & Administration", confidence:"low", autoAssigned:true };
 }
 
 function initTx(vendorAssignees=DEFAULT_VENDOR_ASSIGNEES) {
@@ -206,7 +206,7 @@ function initTx(vendorAssignees=DEFAULT_VENDOR_ASSIGNEES) {
     const assigned = autoAssign(t.vendor);
     return {
       ...t, ...assigned,
-      isRecurring: RECURRING_GL_CODES.has(assigned.gl),
+      isRecurring: RECURRING_GL_CODES.has(assigned.categoryId),
       assigneeId: getAssigneeId(t.vendor, vendorAssignees) || t.userId,
       autoAssignee: !!getAssigneeId(t.vendor, vendorAssignees),
       status:"pending", receipt:null, receiptMatch:null, memo:"", flagReason:"", reconId:null
@@ -681,9 +681,9 @@ function TxDrawer({ tx, currentUser, allUsers, onUpdate, onClose, locked }) {
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
               {local.autoAssigned&&<span className="tag tag-ai">⚡ AI assigned</span>}
               {local.confidence&&<ConfDot level={local.confidence}/>}
-              {local.gl&&(()=>{const cat=CATEGORIES.find(c=>c.id===local.gl);return cat?<span className={cat.billable==="Billable"?"tag tag-green":"tag tag-gray"} style={{fontSize:10}}>{cat.billable}</span>:null;})()}
+              {local.categoryId&&(()=>{const cat=CATEGORIES.find(c=>c.id===local.categoryId);return cat?<span className={cat.billable==="Billable"?"tag tag-green":"tag tag-gray"} style={{fontSize:10}}>{cat.billable}</span>:null;})()}
             </div>
-            <select value={local.gl} disabled={!canEdit} onChange={e=>{const cat=CATEGORIES.find(c=>c.id===e.target.value);setLocal(t=>({...t,gl:e.target.value,glName:cat?.name||"",autoAssigned:false}));}}>
+            <select value={local.categoryId} disabled={!canEdit} onChange={e=>{const cat=CATEGORIES.find(c=>c.id===e.target.value);setLocal(t=>({...t,categoryId:e.target.value,categoryName:cat?.name||"",autoAssigned:false}));}}>
               {CATEGORIES.map(c=><option key={c.id} value={c.id}>{c.name} · {c.billable}</option>)}
             </select>
           </div>
@@ -919,7 +919,7 @@ function ImportModal({ cards, currentUser, onImport, onClose }) {
           const a=autoAssign(vendor);
           return{id:Date.now()+i,date,vendor,description:obj.description||"",amount,
             card:selectedCard,stmtMonth:selectedMonth,userId:currentUser.id,
-            ...a,isRecurring:RECURRING_GL_CODES.has(a.gl),
+            ...a,isRecurring:RECURRING_GL_CODES.has(a.categoryId),
             assigneeId:currentUser.id,autoAssignee:false,
             status:"pending",receipt:null,receiptMatch:null,memo:"",flagReason:"",reconId:null};
         });
@@ -1010,7 +1010,7 @@ function NSModal({ transactions, onClose, onDone }) {
                   <div key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:"var(--surface2)",borderRadius:6,fontSize:12,fontFamily:"var(--mono)"}}>
                     <span style={{color:"var(--text)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"50%"}}>{t.vendor}</span>
                     <div style={{display:"flex",gap:10,alignItems:"center"}}>
-                      <span style={{color:"var(--text3)"}}>{t.gl}</span>
+                      <span style={{color:"var(--text3)"}}>{CATEGORIES.find(c=>c.id===t.categoryId)?.name||t.categoryName||"—"}</span>
                       <span style={{color:"var(--text)",fontWeight:600}}>{fmt(t.amount)}</span>
                       <span style={{opacity:t.receipt?1:0.2}}>📎</span>
                     </div>
@@ -1333,7 +1333,7 @@ export default function App() {
                 {vis.map(t=>{
                   const owner=users.find(u=>u.id===t.userId);
                   const assignee=users.find(u=>u.id===t.assigneeId);
-                  const cat=CATEGORIES.find(c=>c.id===t.gl);
+                  const cat=CATEGORIES.find(c=>c.id===t.categoryId);
                   return(
                     <div key={t.id} className={"tx-row"+(selectedTxId===t.id?" selected":"")}
                       style={{display:"grid",gridTemplateColumns:"82px 1fr 1fr 96px 96px 110px 80px 80px 28px",alignItems:"center",padding:"11px 16px",cursor:"pointer"}}
@@ -1348,7 +1348,7 @@ export default function App() {
                       </div>
                       <div>
                         <div style={{fontSize:12,display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
-                          <span style={{color:"var(--text)",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:160}}>{t.glName||"—"}</span>
+                          <span style={{color:"var(--text)",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:160}}>{t.categoryName||"—"}</span>
                           {cat&&<span className={cat.billable==="Billable"?"tag tag-green":"tag tag-gray"} style={{fontSize:9,padding:"1px 5px"}}>{cat.billable}</span>}
                           {t.autoAssigned&&<span className="tag tag-ai" style={{fontSize:9,padding:"1px 5px"}}>AI</span>}
                         </div>
@@ -1502,7 +1502,7 @@ export default function App() {
                   <div key={vendor} style={{display:"grid",gridTemplateColumns:"1fr 36px 1fr",gap:8,fontSize:11,padding:"6px 10px",background:"var(--surface2)",borderRadius:6}}>
                     <span style={{color:"var(--text)"}}>{vendor}</span>
                     <span style={{color:"var(--text3)",textAlign:"center"}}>→</span>
-                    <span style={{color:"var(--accent)"}}>{rule.glName}</span>
+                    <span style={{color:"var(--accent)"}}>{rule.categoryName}</span>
                   </div>
                 ))}
               </div>
