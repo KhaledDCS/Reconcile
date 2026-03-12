@@ -814,17 +814,37 @@ function CreditCardSettings({ cards, onUpdate }) {
   const [err,setErr]=useState("");
   const [editId,setEditId]=useState(null);
   const [editForm,setEditForm]=useState({});
+  const [saving,setSaving]=useState(false);
 
-  const add=()=>{
+  const add=async()=>{
     if(!form.name||!form.last4||!form.division){setErr("All fields required.");return;}
     if(cards.find(c=>c.name===form.name)){setErr("Card name already exists.");return;}
-    const id="c"+Date.now();
-    onUpdate([...cards,{...form,id,active:true}]);
-    setForm({name:"",network:"Visa",last4:"",division:""});setShowAdd(false);setErr("");
+    setSaving(true);
+    try{
+      const newCard=await api.createCard({...form,active:true});
+      onUpdate([...cards,{id:newCard.id,name:newCard.name,network:newCard.network,last4:newCard.last4,division:newCard.division,active:newCard.active}]);
+      setForm({name:"",network:"Visa",last4:"",division:""});setShowAdd(false);setErr("");
+    }catch(e){setErr("Failed to save. Try again.");}
+    setSaving(false);
   };
 
   const startEdit=(c)=>{setEditId(c.id);setEditForm({...c});};
-  const saveEdit=()=>{onUpdate(cards.map(c=>c.id===editId?{...editForm}:c));setEditId(null);};
+  const saveEdit=async()=>{
+    setSaving(true);
+    try{
+      await api.updateCard(editId,{name:editForm.name,division:editForm.division});
+      onUpdate(cards.map(c=>c.id===editId?{...editForm}:c));
+      setEditId(null);
+    }catch(e){setErr("Failed to save.");}
+    setSaving(false);
+  };
+
+  const toggleActive=async(c)=>{
+    try{
+      await api.updateCard(c.id,{active:!c.active});
+      onUpdate(cards.map(x=>x.id===c.id?{...x,active:!x.active}:x));
+    }catch(e){setErr("Failed to update.");}
+  };
 
   return(
     <div className="card" style={{padding:24,marginBottom:16}}>
@@ -848,7 +868,10 @@ function CreditCardSettings({ cards, onUpdate }) {
             <div className="input-group"><label className="input-label">Division</label><input value={form.division} onChange={e=>setForm(p=>({...p,division:e.target.value}))} placeholder="e.g. Engineering"/></div>
           </div>
           {err&&<div className="alert-error" style={{marginBottom:10}}>{err}</div>}
-          <div style={{display:"flex",gap:8}}><button className="btn-primary" style={{fontSize:12}} onClick={add}>Add Card</button><button className="btn-secondary" style={{fontSize:12}} onClick={()=>{setShowAdd(false);setErr("");}}>Cancel</button></div>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn-primary" style={{fontSize:12}} onClick={add} disabled={saving}>{saving?"Saving…":"Add Card"}</button>
+            <button className="btn-secondary" style={{fontSize:12}} onClick={()=>{setShowAdd(false);setErr("");}}>Cancel</button>
+          </div>
         </div>
       )}
 
@@ -863,7 +886,7 @@ function CreditCardSettings({ cards, onUpdate }) {
               <>
                 <input value={editForm.name} onChange={e=>setEditForm(p=>({...p,name:e.target.value}))} style={{fontSize:12}} placeholder="Card name"/>
                 <input value={editForm.division} onChange={e=>setEditForm(p=>({...p,division:e.target.value}))} style={{fontSize:12}} placeholder="Division"/>
-                <button className="btn-success" style={{fontSize:11,padding:"5px 10px"}} onClick={saveEdit}>Save</button>
+                <button className="btn-success" style={{fontSize:11,padding:"5px 10px"}} onClick={saveEdit} disabled={saving}>{saving?"…":"Save"}</button>
                 <button className="btn-ghost" style={{fontSize:11}} onClick={()=>setEditId(null)}>Cancel</button>
               </>
             ):(
@@ -872,9 +895,9 @@ function CreditCardSettings({ cards, onUpdate }) {
                   <div style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{c.name}</div>
                   <div style={{fontSize:11,color:"var(--text3)"}}>{c.network} · ••{c.last4} · {c.active?"Active":"Inactive"}</div>
                 </div>
-                <span style={{fontSize:12,background:"var(--accent-dim)",color:"var(--accent)",borderRadius:6,padding:"3px 10px",border:"1px solid var(--accent-border)",fontFamily:"var(--mono)",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.division||"—"}</span>
+                <span style={{fontSize:12,background:"var(--accent-dim)",color:"var(--accent)",borderRadius:6,padding:"3px 10px",border:"1px solid var(--accent-border)",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.division||"—"}</span>
                 <button className="btn-ghost" style={{fontSize:11}} onClick={()=>startEdit(c)}>✎ Edit</button>
-                <button className={c.active?"btn-danger":"btn-success"} style={{fontSize:11,padding:"5px 10px"}} onClick={()=>onUpdate(cards.map(x=>x.id===c.id?{...x,active:!x.active}:x))}>
+                <button className={c.active?"btn-danger":"btn-success"} style={{fontSize:11,padding:"5px 10px"}} onClick={()=>toggleActive(c)}>
                   {c.active?"Deactivate":"Activate"}
                 </button>
               </>
@@ -1062,7 +1085,7 @@ export default function App() {
   const [vendorAssignees,setVendorAssignees]=useState(DEFAULT_VENDOR_ASSIGNEES);
   const [transactions,setTransactions]=useState([]);
   const [loading,setLoading]=useState(false);
-  const [cards,setCards]=useState(INITIAL_CARDS);
+  const [cards,setCards]=useState([]);
   const [showImport,setShowImport]=useState(false);
   const [activeTab,setActiveTab]=useState("transactions");
   const [filterStatus,setFilterStatus]=useState("all");
@@ -1091,11 +1114,13 @@ export default function App() {
       api.getTransactions(),
       api.getExportHistory(),
       api.getStatementStatuses(),
-    ]).then(([u,t,e,s])=>{
+      api.getCards(),
+    ]).then(([u,t,e,s,c])=>{
       setUsers(u);
       setTransactions(t);
       setExportHistory(e);
       setStmtStatus(s);
+      setCards(c);
       setLoading(false);
     }).catch(err=>{console.error("DB load error:",err);setLoading(false);});
   },[currentUser]);
