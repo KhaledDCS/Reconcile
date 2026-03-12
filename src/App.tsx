@@ -101,51 +101,57 @@ const INITIAL_CARDS = [
   { id: "c3", name: "MC ••3301",    network: "MC",    last4: "3301", division: "Sales",        active: false },
 ];
 
-const GL_RULES_DATA = {
-  "amazon web services": { gl:"6100", glName:"Cloud Infrastructure", dept:"Engineering" },
-  "aws":                 { gl:"6100", glName:"Cloud Infrastructure", dept:"Engineering" },
-  "slack":               { gl:"6110", glName:"Software & SaaS",      dept:"Operations"  },
-  "zoom":                { gl:"6110", glName:"Software & SaaS",      dept:"Operations"  },
-  "google":              { gl:"6110", glName:"Software & SaaS",      dept:"Engineering" },
-  "microsoft":           { gl:"6110", glName:"Software & SaaS",      dept:"Operations"  },
-  "openai":              { gl:"6110", glName:"Software & SaaS",      dept:"Engineering" },
-  "salesforce":          { gl:"6120", glName:"CRM & Sales Tools",     dept:"Sales"       },
-  "delta":               { gl:"6210", glName:"Airfare",               dept:"G&A"         },
-  "united airlines":     { gl:"6210", glName:"Airfare",               dept:"G&A"         },
-  "marriott":            { gl:"6220", glName:"Hotels & Lodging",      dept:"G&A"         },
-  "hilton":              { gl:"6220", glName:"Hotels & Lodging",      dept:"G&A"         },
-  "airbnb":              { gl:"6220", glName:"Hotels & Lodging",      dept:"G&A"         },
-  "uber":                { gl:"6230", glName:"Ground Transportation", dept:"G&A"         },
-  "lyft":                { gl:"6230", glName:"Ground Transportation", dept:"G&A"         },
-  "doordash":            { gl:"6300", glName:"Meals & Entertainment", dept:"G&A"         },
-  "grubhub":             { gl:"6300", glName:"Meals & Entertainment", dept:"G&A"         },
-  "amazon.com":          { gl:"6020", glName:"Office Supplies",       dept:"Operations"  },
-  "amazon":              { gl:"6020", glName:"Office Supplies",       dept:"Operations"  },
-  "staples":             { gl:"6020", glName:"Office Supplies",       dept:"Operations"  },
-  "fedex":               { gl:"6600", glName:"Shipping & Postage",    dept:"Operations"  },
-  "ups":                 { gl:"6600", glName:"Shipping & Postage",    dept:"Operations"  },
-  "linkedin":            { gl:"6500", glName:"Recruiting & HR",       dept:"HR"          },
-};
-
-const DEFAULT_GL_ACCOUNTS = [
-  { code:"6020", name:"Office Supplies"      },
-  { code:"6100", name:"Cloud Infrastructure" },
-  { code:"6110", name:"Software & SaaS"      },
-  { code:"6120", name:"CRM & Sales Tools"    },
-  { code:"6210", name:"Airfare"              },
-  { code:"6220", name:"Hotels & Lodging"     },
-  { code:"6230", name:"Ground Transportation"},
-  { code:"6300", name:"Meals & Entertainment"},
-  { code:"6400", name:"Professional Services"},
-  { code:"6500", name:"Recruiting & HR"      },
-  { code:"6600", name:"Shipping & Postage"   },
-  { code:"6800", name:"Miscellaneous"        },
+const CATEGORIES = [
+  { id:"cat-01",  name:"Transportation",              billable:"Non-Billable" },
+  { id:"cat-02",  name:"Airfare",                     billable:"Non-Billable" },
+  { id:"cat-03",  name:"Lodging",                     billable:"Non-Billable" },
+  { id:"cat-04",  name:"Office Expense",              billable:"Non-Billable" },
+  { id:"cat-05",  name:"Telephone",                   billable:"Non-Billable" },
+  { id:"cat-06",  name:"Meals",                       billable:"Non-Billable" },
+  { id:"cat-07",  name:"Software Expense",            billable:"Non-Billable" },
+  { id:"cat-08",  name:"Hosting COGS",                billable:"Non-Billable" },
+  { id:"cat-09",  name:"Marketing and Sales Expense", billable:"Non-Billable" },
+  { id:"cat-10",  name:"Conference/Seminar",          billable:"Non-Billable" },
+  { id:"cat-11",  name:"License COGS",                billable:"Non-Billable" },
+  { id:"cat-12",  name:"Internet",                    billable:"Non-Billable" },
+  { id:"cat-13",  name:"Hardware Expense",            billable:"Non-Billable" },
+  { id:"cat-14",  name:"Hardware COGS",               billable:"Billable"     },
+  { id:"cat-15",  name:"Transactional COGS",          billable:"Non-Billable" },
+  { id:"cat-16",  name:"Other COGS",                  billable:"Billable"     },
 ];
 
-const DEPARTMENTS = ["Engineering","Sales","Marketing","Operations","G&A","HR","Finance","Legal"];
+const GL_RULES_DATA = {
+  "amazon web services": { gl:"cat-08", glName:"Hosting COGS",                dept:"IT"                    },
+  "aws":                 { gl:"cat-08", glName:"Hosting COGS",                dept:"IT"                    },
+  "slack":               { gl:"cat-07", glName:"Software Expense",            dept:"General & Administration" },
+  "zoom":                { gl:"cat-07", glName:"Software Expense",            dept:"General & Administration" },
+  "google":              { gl:"cat-07", glName:"Software Expense",            dept:"IT"                    },
+  "microsoft":           { gl:"cat-07", glName:"Software Expense",            dept:"IT"                    },
+  "openai":              { gl:"cat-07", glName:"Software Expense",            dept:"Research & Development" },
+  "salesforce":          { gl:"cat-09", glName:"Marketing and Sales Expense", dept:"Sales"                 },
+  "delta":               { gl:"cat-02", glName:"Airfare",                     dept:"General & Administration" },
+  "united airlines":     { gl:"cat-02", glName:"Airfare",                     dept:"General & Administration" },
+  "marriott":            { gl:"cat-03", glName:"Lodging",                     dept:"General & Administration" },
+  "hilton":              { gl:"cat-03", glName:"Lodging",                     dept:"General & Administration" },
+  "airbnb":              { gl:"cat-03", glName:"Lodging",                     dept:"General & Administration" },
+  "uber":                { gl:"cat-01", glName:"Transportation",              dept:"General & Administration" },
+  "lyft":                { gl:"cat-01", glName:"Transportation",              dept:"General & Administration" },
+  "doordash":            { gl:"cat-06", glName:"Meals",                       dept:"General & Administration" },
+  "grubhub":             { gl:"cat-06", glName:"Meals",                       dept:"General & Administration" },
+  "amazon.com":          { gl:"cat-04", glName:"Office Expense",              dept:"Operations"            },
+  "amazon":              { gl:"cat-04", glName:"Office Expense",              dept:"Operations"            },
+  "staples":             { gl:"cat-04", glName:"Office Expense",              dept:"Operations"            },
+  "fedex":               { gl:"cat-04", glName:"Office Expense",              dept:"Operations"            },
+  "ups":                 { gl:"cat-04", glName:"Office Expense",              dept:"Operations"            },
+  "linkedin":            { gl:"cat-09", glName:"Marketing and Sales Expense", dept:"Sales & Marketing"     },
+};
 
-// GL codes that flag a transaction as recurring/subscription
-const RECURRING_GL_CODES = new Set(["6100","6110","6120","6500"]);
+const DEFAULT_GL_ACCOUNTS = CATEGORIES;
+
+const DEPARTMENTS = ["IT","Research & Development","General & Administration","Marketing","Customer Support","G&A Corporate","Sales","Sales & Marketing","Operations"];
+
+// Category IDs that flag a transaction as recurring/subscription
+const RECURRING_GL_CODES = new Set(["cat-07","cat-08","cat-11","cat-12"]);
 
 // Vendor keyword → userId auto-assignee (admin can edit in Settings)
 const DEFAULT_VENDOR_ASSIGNEES = {
@@ -192,7 +198,7 @@ const genReconId = () => `RECON-${new Date().getFullYear()}-${String(_seq++).pad
 function autoAssign(vendor) {
   const v = vendor.toLowerCase();
   for (const [k,val] of Object.entries(GL_RULES_DATA)) { if (v.includes(k)) return {...val, confidence:"high", autoAssigned:true}; }
-  return { gl:"6800", glName:"Miscellaneous", dept:"G&A", confidence:"low", autoAssigned:true };
+  return { gl:"cat-04", glName:"Office Expense", dept:"General & Administration", confidence:"low", autoAssigned:true };
 }
 
 function initTx(vendorAssignees=DEFAULT_VENDOR_ASSIGNEES) {
@@ -646,7 +652,7 @@ Respond ONLY with valid JSON, no markdown, no explanation:
 }
 
 // ── TRANSACTION DRAWER ────────────────────────────────────────────────────────
-function TxDrawer({ tx, glAccounts, currentUser, allUsers, onUpdate, onClose, locked }) {
+function TxDrawer({ tx, currentUser, allUsers, onUpdate, onClose, locked }) {
   const [local,setLocal]=useState({...tx});
   const fileRef=useRef();
   const isAdmin=currentUser.role==="admin";
@@ -671,13 +677,14 @@ function TxDrawer({ tx, glAccounts, currentUser, allUsers, onUpdate, onClose, lo
 
         <div style={{padding:"20px 24px",display:"flex",flexDirection:"column",gap:18,flex:1}}>
           <div>
-            <span className="sidebar-label">GL Account</span>
+            <span className="sidebar-label">Category</span>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
               {local.autoAssigned&&<span className="tag tag-ai">⚡ AI assigned</span>}
               {local.confidence&&<ConfDot level={local.confidence}/>}
+              {local.gl&&(()=>{const cat=CATEGORIES.find(c=>c.id===local.gl);return cat?<span className={cat.billable==="Billable"?"tag tag-green":"tag tag-gray"} style={{fontSize:10}}>{cat.billable}</span>:null;})()}
             </div>
-            <select value={local.gl} disabled={!canEdit} onChange={e=>{const f=glAccounts.find(g=>g.code===e.target.value);setLocal(t=>({...t,gl:e.target.value,glName:f?.name||"",autoAssigned:false}));}}>
-              {glAccounts.map(g=><option key={g.code} value={g.code}>{g.code} · {g.name}</option>)}
+            <select value={local.gl} disabled={!canEdit} onChange={e=>{const cat=CATEGORIES.find(c=>c.id===e.target.value);setLocal(t=>({...t,gl:e.target.value,glName:cat?.name||"",autoAssigned:false}));}}>
+              {CATEGORIES.map(c=><option key={c.id} value={c.id}>{c.name} · {c.billable}</option>)}
             </select>
           </div>
           <div>
@@ -692,7 +699,7 @@ function TxDrawer({ tx, glAccounts, currentUser, allUsers, onUpdate, onClose, lo
               <option value="">— Unassigned —</option>
               {allUsers.filter(u=>u.active).map(u=><option key={u.id} value={u.id}>{u.name} ({ROLE_LABEL[u.role]})</option>)}
             </select>
-            {local.isRecurring&&<div style={{marginTop:6,display:"flex",alignItems:"center",gap:6}}><span className="tag tag-purple" style={{fontSize:10}}>↻ Recurring charge</span><span style={{fontSize:11,color:"var(--text3)"}}>Auto-detected from GL {local.gl}</span></div>}
+            {local.isRecurring&&<div style={{marginTop:6,display:"flex",alignItems:"center",gap:6}}><span className="tag tag-purple" style={{fontSize:10}}>↻ Recurring charge</span><span style={{fontSize:11,color:"var(--text3)"}}>Auto-detected from category</span></div>}
           </div>
           <div>
             <span className="sidebar-label">Memo</span>
@@ -1055,7 +1062,6 @@ export default function App() {
   const [vendorAssignees,setVendorAssignees]=useState(DEFAULT_VENDOR_ASSIGNEES);
   const [transactions,setTransactions]=useState([]);
   const [loading,setLoading]=useState(false);
-  const [glAccounts,setGlAccounts]=useState(DEFAULT_GL_ACCOUNTS);
   const [cards,setCards]=useState(INITIAL_CARDS);
   const [showImport,setShowImport]=useState(false);
   const [activeTab,setActiveTab]=useState("transactions");
@@ -1066,7 +1072,6 @@ export default function App() {
   const [search,setSearch]=useState("");
   const [selectedTxId,setSelectedTxId]=useState(null);
   const [showNS,setShowNS]=useState(false);
-  const [showGL,setShowGL]=useState(false);
   const [showStmt,setShowStmt]=useState(false);
   const [uploadedReceipts,setUploadedReceipts]=useState([]);
   const [showMatcher,setShowMatcher]=useState(false);
@@ -1321,13 +1326,14 @@ export default function App() {
             {/* Table */}
             <div className="card" style={{overflow:"hidden"}}>
               <div style={{display:"grid",gridTemplateColumns:"82px 1fr 1fr 96px 96px 110px 80px 80px 28px",padding:"10px 16px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em"}}>
-                <span>Date</span><span>Vendor</span><span>GL · Dept</span><span>User</span><span>Assignee</span><span style={{textAlign:"right"}}>Amount</span><span style={{textAlign:"center"}}>Receipt</span><span style={{textAlign:"center"}}>Status</span><span/>
+                <span>Date</span><span>Vendor</span><span>Category · Dept</span><span>User</span><span>Assignee</span><span style={{textAlign:"right"}}>Amount</span><span style={{textAlign:"center"}}>Receipt</span><span style={{textAlign:"center"}}>Status</span><span/>
               </div>
               <div style={{overflowY:"auto",maxHeight:"calc(100vh - 420px)"}}>
                 {vis.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--text3)",fontSize:13}}>No transactions match your filters.</div>}
                 {vis.map(t=>{
                   const owner=users.find(u=>u.id===t.userId);
                   const assignee=users.find(u=>u.id===t.assigneeId);
+                  const cat=CATEGORIES.find(c=>c.id===t.gl);
                   return(
                     <div key={t.id} className={"tx-row"+(selectedTxId===t.id?" selected":"")}
                       style={{display:"grid",gridTemplateColumns:"82px 1fr 1fr 96px 96px 110px 80px 80px 28px",alignItems:"center",padding:"11px 16px",cursor:"pointer"}}
@@ -1341,11 +1347,10 @@ export default function App() {
                         <div style={{fontSize:11,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:200}}>{t.description}</div>
                       </div>
                       <div>
-                        <div style={{fontSize:11,display:"flex",alignItems:"center",gap:5}}>
-                          <span style={{color:"var(--text2)",fontFamily:"var(--mono)"}}>{t.gl}</span>
-                          <span style={{color:"var(--text3)"}}>· {t.glName}</span>
+                        <div style={{fontSize:12,display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
+                          <span style={{color:"var(--text)",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:160}}>{t.glName||"—"}</span>
+                          {cat&&<span className={cat.billable==="Billable"?"tag tag-green":"tag tag-gray"} style={{fontSize:9,padding:"1px 5px"}}>{cat.billable}</span>}
                           {t.autoAssigned&&<span className="tag tag-ai" style={{fontSize:9,padding:"1px 5px"}}>AI</span>}
-                          {t.confidence&&<ConfDot level={t.confidence}/>}
                         </div>
                         <div style={{fontSize:11,color:"var(--text3)",marginTop:2,display:"flex",alignItems:"center",gap:5}}>
                           {t.dept}
@@ -1460,17 +1465,18 @@ export default function App() {
             <CreditCardSettings cards={cards} onUpdate={setCards}/>
 
             <div className="card" style={{padding:24,marginBottom:16}}>
-              <div style={{fontSize:14,fontWeight:600,color:"var(--text)",marginBottom:4}}>Chart of Accounts</div>
-              <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>GL codes used for AI auto-assignment.</div>
-              <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto",marginBottom:14}}>
-                {glAccounts.map(g=>(
-                  <div key={g.code} style={{display:"flex",gap:12,fontSize:12,padding:"6px 10px",background:"var(--surface2)",borderRadius:6,fontFamily:"var(--mono)"}}>
-                    <span style={{color:"var(--accent)",minWidth:48}}>{g.code}</span>
-                    <span style={{color:"var(--text2)"}}>{g.name}</span>
+              <div style={{fontSize:14,fontWeight:600,color:"var(--text)",marginBottom:4}}>Expense Categories</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Fixed categories used for AI auto-assignment. Billable status shown per category.</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:6,maxHeight:260,overflowY:"auto"}}>
+                {CATEGORIES.map(c=>(
+                  <div key={c.id} style={{display:"contents"}}>
+                    <div style={{fontSize:12,padding:"7px 10px",background:"var(--surface2)",borderRadius:6,color:"var(--text)",display:"flex",alignItems:"center"}}>{c.name}</div>
+                    <div style={{padding:"7px 0",display:"flex",alignItems:"center"}}>
+                      <span className={c.billable==="Billable"?"tag tag-green":"tag tag-gray"} style={{fontSize:10,whiteSpace:"nowrap"}}>{c.billable}</span>
+                    </div>
                   </div>
                 ))}
               </div>
-              <button className="btn-secondary" style={{fontSize:12}} onClick={()=>setShowGL(true)}>Edit Chart of Accounts</button>
             </div>
 
             <div className="card" style={{padding:24,marginBottom:16}}>
@@ -1490,13 +1496,13 @@ export default function App() {
 
             <div className="card" style={{padding:24,marginBottom:16}}>
               <div style={{fontSize:14,fontWeight:600,color:"var(--text)",marginBottom:4}}>Auto-Assignment Rules</div>
-              <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Vendor → GL mapping used by AI.</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Vendor → Category mapping used by AI.</div>
               <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:200,overflowY:"auto"}}>
                 {Object.entries(GL_RULES_DATA).map(([vendor,rule])=>(
-                  <div key={vendor} style={{display:"grid",gridTemplateColumns:"1fr 36px 1fr",gap:8,fontSize:11,padding:"6px 10px",background:"var(--surface2)",borderRadius:6,fontFamily:"var(--mono)"}}>
+                  <div key={vendor} style={{display:"grid",gridTemplateColumns:"1fr 36px 1fr",gap:8,fontSize:11,padding:"6px 10px",background:"var(--surface2)",borderRadius:6}}>
                     <span style={{color:"var(--text)"}}>{vendor}</span>
                     <span style={{color:"var(--text3)",textAlign:"center"}}>→</span>
-                    <span style={{color:"var(--accent)"}}>{rule.gl} · {rule.glName}</span>
+                    <span style={{color:"var(--accent)"}}>{rule.glName}</span>
                   </div>
                 ))}
               </div>
@@ -1558,12 +1564,11 @@ export default function App() {
       </div>
 
       {/* OVERLAYS */}
-      {selectedTx&&<TxDrawer tx={selectedTx} glAccounts={glAccounts} currentUser={currentUser} allUsers={users} onUpdate={update} onClose={()=>setSelectedTxId(null)} locked={isUser&&stmtLocked}/>}
+      {selectedTx&&<TxDrawer tx={selectedTx} currentUser={currentUser} allUsers={users} onUpdate={update} onClose={()=>setSelectedTxId(null)} locked={isUser&&stmtLocked}/>}
       {showStmt&&<StatementModal myTxs={myTxs} onConfirm={submitStmt} onClose={()=>setShowStmt(false)}/>}
       {showMatcher&&<ReceiptMatcher receipts={uploadedReceipts} rawFiles={rawFiles} transactions={isUser?myTxs:transactions} onConfirm={handleMatchConfirm} onClose={()=>setShowMatcher(false)}/>}
       {showImport&&<ImportModal cards={cards} currentUser={currentUser} onImport={handleImport} onClose={()=>setShowImport(false)}/>}
       {showNS&&<NSModal transactions={transactions} onClose={()=>setShowNS(false)} onDone={handleExportDone}/>}
-      {showGL&&<GLSettings glAccounts={glAccounts} onSave={setGlAccounts} onClose={()=>setShowGL(false)}/>}
     </div>
   );
 }
