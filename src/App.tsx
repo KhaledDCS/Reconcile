@@ -88,11 +88,17 @@ const CSS = `
 
 // ── DATA ──────────────────────────────────────────────────────────────────────
 const INITIAL_USERS = [
-  { id: "u1", name: "Admin User",  email: "admin@company.com",  password: "admin123", role: "admin",      active: true, card: null,         createdAt: "2025-01-01" },
-  { id: "u2", name: "Jordan Lee",  email: "jordan@company.com", password: "pass123",  role: "cardholder", active: true, card: "Visa ••4291", createdAt: "2025-01-10" },
-  { id: "u3", name: "Alex Kim",    email: "alex@company.com",   password: "pass123",  role: "cardholder", active: true, card: "Amex ••8812", createdAt: "2025-01-10" },
-  { id: "u4", name: "Morgan Chen", email: "morgan@company.com", password: "pass123",  role: "cardholder", active: true, card: "Visa ••4291", createdAt: "2025-01-15" },
-  { id: "u5", name: "Sam Rivera",  email: "sam@company.com",    password: "pass123",  role: "reviewer",   active: true, card: null,         createdAt: "2025-01-05" },
+  { id: "u1", name: "Admin User",  email: "admin@company.com",  password: "admin123", role: "admin", active: true, card: null,         createdAt: "2025-01-01" },
+  { id: "u2", name: "Jordan Lee",  email: "jordan@company.com", password: "pass123",  role: "user",  active: true, card: "Visa ••4291", createdAt: "2025-01-10" },
+  { id: "u3", name: "Alex Kim",    email: "alex@company.com",   password: "pass123",  role: "user",  active: true, card: "Amex ••8812", createdAt: "2025-01-10" },
+  { id: "u4", name: "Morgan Chen", email: "morgan@company.com", password: "pass123",  role: "user",  active: true, card: "Visa ••4291", createdAt: "2025-01-15" },
+  { id: "u5", name: "Sam Rivera",  email: "sam@company.com",    password: "pass123",  role: "user",  active: true, card: null,         createdAt: "2025-01-05" },
+];
+
+const INITIAL_CARDS = [
+  { id: "c1", name: "Visa ••4291",  network: "Visa",  last4: "4291", division: "Engineering", active: true },
+  { id: "c2", name: "Amex ••8812",  network: "Amex",  last4: "8812", division: "Operations",  active: true },
+  { id: "c3", name: "MC ••3301",    network: "MC",    last4: "3301", division: "Sales",        active: false },
 ];
 
 const GL_RULES_DATA = {
@@ -202,8 +208,8 @@ function initTx(vendorAssignees=DEFAULT_VENDOR_ASSIGNEES) {
   });
 }
 
-const ROLE_COLOR = { admin:"#a855f7", reviewer:"#4f7df3", cardholder:"#22c55e" };
-const ROLE_LABEL = { admin:"Admin", reviewer:"Reviewer", cardholder:"Cardholder" };
+const ROLE_COLOR = { admin:"#a855f7", user:"#4f7df3" };
+const ROLE_LABEL = { admin:"Admin", user:"User" };
 
 // ── SMALL UI ──────────────────────────────────────────────────────────────────
 function Av({ name, color="#4f7df3", size=30 }) {
@@ -212,7 +218,7 @@ function Av({ name, color="#4f7df3", size=30 }) {
 }
 
 function RoleTag({ role }) {
-  const m={admin:"tag-purple",reviewer:"tag-blue",cardholder:"tag-green"};
+  const m={admin:"tag-purple", user:"tag-blue"};
   return <span className={`tag ${m[role]||"tag-gray"}`}>{ROLE_LABEL[role]||role}</span>;
 }
 
@@ -302,7 +308,7 @@ function LoginPage({ onLogin }) {
 // ── USER MANAGEMENT ───────────────────────────────────────────────────────────
 function UserMgmt({ users, onUpdate }) {
   const [showAdd,setShowAdd]=useState(false);
-  const [form,setForm]=useState({name:"",email:"",password:"",role:"cardholder",card:""});
+  const [form,setForm]=useState({name:"",email:"",password:"",role:"user",card:""});
   const [err,setErr]=useState("");
 
   const add=async ()=>{
@@ -310,7 +316,7 @@ function UserMgmt({ users, onUpdate }) {
     if(users.find(u=>u.email===form.email)){setErr("Email already exists.");return;}
     const newUser=await api.createUser(form);
     onUpdate([...users,{...newUser,createdAt:newUser.created_at}]);
-    setForm({name:"",email:"",password:"",role:"cardholder",card:""});setShowAdd(false);setErr("");
+    setForm({name:"",email:"",password:"",role:"user",card:""});setShowAdd(false);setErr("");
   };
 
   return (
@@ -339,8 +345,7 @@ function UserMgmt({ users, onUpdate }) {
             <div style={{fontSize:12,color:"var(--text2)",fontFamily:"var(--mono)",alignSelf:"center"}}>{u.email}</div>
             <div style={{alignSelf:"center"}}>
               <select value={u.role} onChange={async e=>{await api.updateUser(u.id,{role:e.target.value});onUpdate(users.map(x=>x.id===u.id?{...x,role:e.target.value}:x));}} style={{fontSize:12,width:"auto"}}>
-                <option value="cardholder">Cardholder</option>
-                <option value="reviewer">Reviewer</option>
+                <option value="user">User</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
@@ -367,8 +372,7 @@ function UserMgmt({ users, onUpdate }) {
               <div className="input-group">
                 <label className="input-label">Role</label>
                 <select value={form.role} onChange={e=>setForm(p=>({...p,role:e.target.value}))}>
-                  <option value="cardholder">Cardholder</option>
-                  <option value="reviewer">Reviewer</option>
+                  <option value="user">User</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
@@ -645,8 +649,8 @@ Respond ONLY with valid JSON, no markdown, no explanation:
 function TxDrawer({ tx, glAccounts, currentUser, allUsers, onUpdate, onClose, locked }) {
   const [local,setLocal]=useState({...tx});
   const fileRef=useRef();
-  const isReviewer=currentUser.role==="reviewer"||currentUser.role==="admin";
-  const canEdit=!locked||(isReviewer&&tx.status==="submitted");
+  const isAdmin=currentUser.role==="admin";
+  const canEdit=!locked||(isAdmin&&tx.status==="submitted");
 
   const save=()=>{onUpdate(local.id,local);onClose();};
   const handleFile=(file)=>{if(!file)return;setLocal(t=>({...t,receipt:{name:file.name,size:file.size,url:URL.createObjectURL(file)}}));};
@@ -684,7 +688,7 @@ function TxDrawer({ tx, glAccounts, currentUser, allUsers, onUpdate, onClose, lo
           </div>
           <div>
             <span className="sidebar-label">Assignee {local.autoAssignee&&<span className="tag tag-ai" style={{fontSize:9,padding:"1px 5px",verticalAlign:"middle"}}>⚡ Auto</span>}</span>
-            <select value={local.assigneeId||""} disabled={!isReviewer} onChange={e=>setLocal(t=>({...t,assigneeId:e.target.value,autoAssignee:false}))}>
+            <select value={local.assigneeId||""} disabled={!isAdmin} onChange={e=>setLocal(t=>({...t,assigneeId:e.target.value,autoAssignee:false}))}>
               <option value="">— Unassigned —</option>
               {allUsers.filter(u=>u.active).map(u=><option key={u.id} value={u.id}>{u.name} ({ROLE_LABEL[u.role]})</option>)}
             </select>
@@ -722,7 +726,7 @@ function TxDrawer({ tx, glAccounts, currentUser, allUsers, onUpdate, onClose, lo
             <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
           </div>
 
-          {isReviewer&&local.status==="submitted"&&(
+          {isAdmin&&local.status==="submitted"&&(
             <div>
               <span className="sidebar-label">Flag reason (if rejecting)</span>
               <input value={local.flagReason} onChange={e=>setLocal(t=>({...t,flagReason:e.target.value}))} placeholder="e.g. Wrong GL, missing memo..."/>
@@ -731,7 +735,7 @@ function TxDrawer({ tx, glAccounts, currentUser, allUsers, onUpdate, onClose, lo
         </div>
 
         <div style={{padding:"16px 24px",borderTop:"1px solid var(--border)",display:"flex",gap:8,flexWrap:"wrap"}}>
-          {isReviewer&&local.status==="submitted"&&(
+          {isAdmin&&local.status==="submitted"&&(
             <>
               <button className="btn-success" style={{flex:1}} onClick={()=>{setLocal(t=>({...t,status:"approved"}));setTimeout(save,50);}}>✓ Approve</button>
               <button className="btn-danger" style={{flex:1}} onClick={()=>{setLocal(t=>({...t,status:"flagged"}));setTimeout(save,50);}}>⚑ Flag</button>
@@ -796,6 +800,170 @@ function StatementModal({ myTxs, onConfirm, onClose }) {
 }
 
 // ── NETSUITE MODAL ────────────────────────────────────────────────────────────
+// ── CREDIT CARD SETTINGS ─────────────────────────────────────────────────────
+function CreditCardSettings({ cards, onUpdate }) {
+  const [showAdd,setShowAdd]=useState(false);
+  const [form,setForm]=useState({name:"",network:"Visa",last4:"",division:""});
+  const [err,setErr]=useState("");
+  const [editId,setEditId]=useState(null);
+  const [editForm,setEditForm]=useState({});
+
+  const add=()=>{
+    if(!form.name||!form.last4||!form.division){setErr("All fields required.");return;}
+    if(cards.find(c=>c.name===form.name)){setErr("Card name already exists.");return;}
+    const id="c"+Date.now();
+    onUpdate([...cards,{...form,id,active:true}]);
+    setForm({name:"",network:"Visa",last4:"",division:""});setShowAdd(false);setErr("");
+  };
+
+  const startEdit=(c)=>{setEditId(c.id);setEditForm({...c});};
+  const saveEdit=()=>{onUpdate(cards.map(c=>c.id===editId?{...editForm}:c));setEditId(null);};
+
+  return(
+    <div className="card" style={{padding:24,marginBottom:16}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+        <div style={{fontSize:14,fontWeight:600,color:"var(--text)"}}>Credit Cards</div>
+        <button className="btn-primary" style={{fontSize:12,padding:"6px 14px"}} onClick={()=>setShowAdd(v=>!v)}>+ Add Card</button>
+      </div>
+      <div style={{fontSize:12,color:"var(--text3)",marginBottom:16}}>Manage cards available for statement imports. Division is a custom label per card.</div>
+
+      {/* Add form */}
+      {showAdd&&(
+        <div style={{background:"var(--surface2)",border:"1px solid var(--accent-border)",borderRadius:10,padding:16,marginBottom:16}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div className="input-group"><label className="input-label">Card Name / Label</label><input value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} placeholder="Visa ••4291"/></div>
+            <div className="input-group"><label className="input-label">Network</label>
+              <select value={form.network} onChange={e=>setForm(p=>({...p,network:e.target.value}))}>
+                {["Visa","Mastercard","Amex","Discover"].map(n=><option key={n}>{n}</option>)}
+              </select>
+            </div>
+            <div className="input-group"><label className="input-label">Last 4 Digits</label><input value={form.last4} onChange={e=>setForm(p=>({...p,last4:e.target.value.slice(0,4)}))} placeholder="4291" maxLength={4}/></div>
+            <div className="input-group"><label className="input-label">Division</label><input value={form.division} onChange={e=>setForm(p=>({...p,division:e.target.value}))} placeholder="e.g. Engineering"/></div>
+          </div>
+          {err&&<div className="alert-error" style={{marginBottom:10}}>{err}</div>}
+          <div style={{display:"flex",gap:8}}><button className="btn-primary" style={{fontSize:12}} onClick={add}>Add Card</button><button className="btn-secondary" style={{fontSize:12}} onClick={()=>{setShowAdd(false);setErr("");}}>Cancel</button></div>
+        </div>
+      )}
+
+      {/* Cards list */}
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {cards.map(c=>(
+          <div key={c.id} style={{display:"grid",gridTemplateColumns:"40px 1fr 120px 100px 90px",gap:12,alignItems:"center",padding:"12px 14px",background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)",opacity:c.active?1:0.5}}>
+            <div style={{width:32,height:32,borderRadius:8,background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>
+              {c.network==="Visa"?"💳":c.network==="Amex"?"🟦":c.network==="Mastercard"?"🔴":"💳"}
+            </div>
+            {editId===c.id?(
+              <>
+                <input value={editForm.name} onChange={e=>setEditForm(p=>({...p,name:e.target.value}))} style={{fontSize:12}} placeholder="Card name"/>
+                <input value={editForm.division} onChange={e=>setEditForm(p=>({...p,division:e.target.value}))} style={{fontSize:12}} placeholder="Division"/>
+                <button className="btn-success" style={{fontSize:11,padding:"5px 10px"}} onClick={saveEdit}>Save</button>
+                <button className="btn-ghost" style={{fontSize:11}} onClick={()=>setEditId(null)}>Cancel</button>
+              </>
+            ):(
+              <>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{c.name}</div>
+                  <div style={{fontSize:11,color:"var(--text3)"}}>{c.network} · ••{c.last4} · {c.active?"Active":"Inactive"}</div>
+                </div>
+                <span style={{fontSize:12,background:"var(--accent-dim)",color:"var(--accent)",borderRadius:6,padding:"3px 10px",border:"1px solid var(--accent-border)",fontFamily:"var(--mono)",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.division||"—"}</span>
+                <button className="btn-ghost" style={{fontSize:11}} onClick={()=>startEdit(c)}>✎ Edit</button>
+                <button className={c.active?"btn-danger":"btn-success"} style={{fontSize:11,padding:"5px 10px"}} onClick={()=>onUpdate(cards.map(x=>x.id===c.id?{...x,active:!x.active}:x))}>
+                  {c.active?"Deactivate":"Activate"}
+                </button>
+              </>
+            )}
+          </div>
+        ))}
+        {cards.length===0&&<div style={{fontSize:12,color:"var(--text3)",textAlign:"center",padding:"20px 0"}}>No cards yet. Add one above.</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── CSV IMPORT MODAL ─────────────────────────────────────────────────────────
+function ImportModal({ cards, currentUser, onImport, onClose }) {
+  const [selectedCard,setSelectedCard]=useState("");
+  const [selectedMonth,setSelectedMonth]=useState("");
+  const [file,setFile]=useState(null);
+  const [err,setErr]=useState("");
+  const fileRef=useRef();
+  const activeCards=cards.filter(c=>c.active);
+  const monthOptions=[];
+  const now=new Date();
+  for(let i=0;i<12;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    monthOptions.push({value:d.toISOString().slice(0,7),label:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()]+" "+d.getFullYear()});
+  }
+  const process=()=>{
+    if(!selectedCard){setErr("Please select a card.");return;}
+    if(!selectedMonth){setErr("Please select a statement month.");return;}
+    if(!file){setErr("Please select a CSV file.");return;}
+    const r=new FileReader();
+    r.onload=e=>{
+      try{
+        const lines=e.target.result.split("\n").filter(Boolean);
+        const headers=lines[0].toLowerCase().split(",").map(h=>h.trim().replace(/"/g,""));
+        const rows=lines.slice(1).map((line,i)=>{
+          const vals=line.split(",").map(v=>v.trim().replace(/"/g,""));
+          const obj={};headers.forEach((h,j)=>obj[h]=vals[j]||"");
+          const vendor=obj.vendor||obj.merchant||obj.description||"Unknown";
+          const amount=parseFloat((obj.amount||obj.debit||"0").replace(/[$,]/g,""))||0;
+          const date=obj.date||selectedMonth+"-01";
+          const a=autoAssign(vendor);
+          return{id:Date.now()+i,date,vendor,description:obj.description||"",amount,
+            card:selectedCard,stmtMonth:selectedMonth,userId:currentUser.id,
+            ...a,isRecurring:RECURRING_GL_CODES.has(a.gl),
+            assigneeId:currentUser.id,autoAssignee:false,
+            status:"pending",receipt:null,receiptMatch:null,memo:"",flagReason:"",reconId:null};
+        });
+        onImport(rows);onClose();
+      }catch{setErr("Could not parse CSV. Ensure columns: Date, Vendor, Amount.");}
+    };
+    r.readAsText(file);
+  };
+  return(
+    <div className="modal-overlay">
+      <div className="modal-box card" style={{width:"100%",maxWidth:480,padding:28}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <div style={{fontSize:16,fontWeight:700,color:"var(--text)"}}>Import Credit Card Statement</div>
+          <button className="btn-ghost" onClick={onClose}>✕</button>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:14,marginBottom:18}}>
+          <div className="input-group"><label className="input-label">Credit Card</label>
+            <select value={selectedCard} onChange={e=>setSelectedCard(e.target.value)}>
+              <option value="">— Select card —</option>
+              {activeCards.map(c=><option key={c.id} value={c.name}>{c.name} · {c.division}</option>)}
+            </select>
+          </div>
+          <div className="input-group"><label className="input-label">Statement Month</label>
+            <select value={selectedMonth} onChange={e=>setSelectedMonth(e.target.value)}>
+              <option value="">— Select month —</option>
+              {monthOptions.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+          </div>
+          <div className="input-group"><label className="input-label">CSV File</label>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              <div style={{flex:1,padding:"8px 12px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:"var(--radius)",fontSize:12,color:file?"var(--text)":"var(--text3)",cursor:"pointer",fontFamily:"var(--mono)"}} onClick={()=>fileRef.current.click()}>
+                {file?file.name:"Click to select CSV…"}
+              </div>
+              <button className="btn-secondary" style={{fontSize:12,whiteSpace:"nowrap"}} onClick={()=>fileRef.current.click()}>Browse</button>
+            </div>
+            <input ref={fileRef} type="file" accept=".csv" style={{display:"none"}} onChange={e=>setFile(e.target.files[0])}/>
+          </div>
+        </div>
+        {err&&<div className="alert-error" style={{marginBottom:14}}>⚠ {err}</div>}
+        {selectedCard&&selectedMonth&&<div style={{background:"var(--accent-dim)",border:"1px solid var(--accent-border)",borderRadius:"var(--radius)",padding:"10px 14px",marginBottom:14,fontSize:12,color:"var(--accent)"}}>
+          ℹ All rows tagged: <strong>{selectedCard}</strong> · <strong>{monthOptions.find(m=>m.value===selectedMonth)?.label}</strong>
+        </div>}
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+          <button className="btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn-primary" onClick={process}>Import Statement →</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NSModal({ transactions, onClose, onDone }) {
   const [step,setStep]=useState(0);
   const [reconId]=useState(genReconId);
@@ -888,9 +1056,12 @@ export default function App() {
   const [transactions,setTransactions]=useState([]);
   const [loading,setLoading]=useState(false);
   const [glAccounts,setGlAccounts]=useState(DEFAULT_GL_ACCOUNTS);
+  const [cards,setCards]=useState(INITIAL_CARDS);
+  const [showImport,setShowImport]=useState(false);
   const [activeTab,setActiveTab]=useState("transactions");
   const [filterStatus,setFilterStatus]=useState("all");
   const [filterUser,setFilterUser]=useState("all");
+  const [filterCard,setFilterCard]=useState("all");
   const [filterMonth,setFilterMonth]=useState("all");
   const [search,setSearch]=useState("");
   const [selectedTxId,setSelectedTxId]=useState(null);
@@ -925,8 +1096,7 @@ export default function App() {
   },[currentUser]);
 
   const isAdmin=currentUser?.role==="admin";
-  const isReviewer=currentUser?.role==="reviewer"||currentUser?.role==="admin";
-  const isCardholder=currentUser?.role==="cardholder";
+  const isUser=currentUser?.role==="user";
 
   const update=useCallback(async (id,changes)=>{
     // Handle receipt separately
@@ -958,26 +1128,7 @@ export default function App() {
     setShowStmt(false);
   };
 
-  const handleCSV=(file)=>{
-    if(!file)return;
-    const r=new FileReader();
-    r.onload=e=>{
-      try{
-        const lines=e.target.result.split("\n").filter(Boolean);
-        const headers=lines[0].toLowerCase().split(",").map(h=>h.trim().replace(/"/g,""));
-        const rows=lines.slice(1).map((line,i)=>{
-          const vals=line.split(",").map(v=>v.trim().replace(/"/g,""));
-          const obj={};headers.forEach((h,j)=>obj[h]=vals[j]||"");
-          const vendor=obj.vendor||obj.merchant||obj.description||"Unknown";
-          const amount=parseFloat((obj.amount||obj.debit||"0").replace(/[$,]/g,""))||0;
-          const date=obj.date||new Date().toISOString().slice(0,10);
-          return{id:Date.now()+i,date,vendor,description:obj.description||"",amount,card:obj.card||"Unknown",userId:currentUser.id,...autoAssign(vendor),status:"pending",receipt:null,receiptMatch:null,memo:"",flagReason:"",reconId:null};
-        });
-        setTransactions(prev=>[...prev,...rows]);setCsvErr("");
-      }catch{setCsvErr("Could not parse CSV. Ensure columns: Date, Vendor, Amount.");}
-    };
-    r.readAsText(file);
-  };
+  const handleImport=(rows)=>{ setTransactions(prev=>[...prev,...rows]); };
 
   const [rawFiles,setRawFiles]=useState([]);
 
@@ -1021,20 +1172,21 @@ export default function App() {
   const availableMonths = [...new Set(transactions.map(t=>t.date.slice(0,7)))].sort();
 
   const vis=transactions.filter(t=>{
-    if(isCardholder&&t.userId!==currentUser.id)return false;
+    if(isUser&&t.userId!==currentUser.id)return false;
     if(filterStatus!=="all"&&t.status!==filterStatus)return false;
     if(filterUser!=="all"&&t.userId!==filterUser)return false;
+    if(filterCard!=="all"&&t.card!==filterCard)return false;
     if(filterMonth!=="all"&&!t.date.startsWith(filterMonth))return false;
     if(search&&!t.vendor.toLowerCase().includes(search.toLowerCase())&&!t.description.toLowerCase().includes(search.toLowerCase()))return false;
     return true;
   });
 
   const counts={
-    all:isCardholder?myTxs.length:transactions.length,
-    pending:transactions.filter(t=>t.status==="pending"&&(isCardholder?t.userId===currentUser?.id:true)).length,
+    all:isUser?myTxs.length:transactions.length,
+    pending:transactions.filter(t=>t.status==="pending"&&(isUser?t.userId===currentUser?.id:true)).length,
     submitted:transactions.filter(t=>t.status==="submitted").length,
     approved:transactions.filter(t=>t.status==="approved").length,
-    flagged:transactions.filter(t=>t.status==="flagged"&&(isCardholder?t.userId===currentUser?.id:true)).length,
+    flagged:transactions.filter(t=>t.status==="flagged"&&(isUser?t.userId===currentUser?.id:true)).length,
     exported:transactions.filter(t=>t.status==="exported").length,
   };
 
@@ -1057,7 +1209,7 @@ export default function App() {
     </div>
   );;
 
-  const tabs=isCardholder?["transactions","receipts"]:isAdmin?["transactions","receipts","users","settings"]:["transactions","receipts","settings"];
+  const tabs=isAdmin?["transactions","receipts","users","settings"]:["transactions","receipts"];
   const totalRcptBadge=unmappedReceipts.length+uploadedReceipts.length;
   const tabLabel={transactions:"Transactions",receipts:"Receipts"+(unmappedReceipts.length>0?" ("+unmappedReceipts.length+" unmapped)":""),users:"Users",settings:"Settings"};
 
@@ -1083,13 +1235,7 @@ export default function App() {
             {tabs.map(t=><button key={t} className={`nav-tab ${activeTab===t?"active":""}`} onClick={()=>setActiveTab(t)}>{tabLabel[t]}</button>)}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10,paddingLeft:16,flexShrink:0}}>
-            {isCardholder&&(
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <StmtTag status={myStmt}/>
-                {myStmt==="open"&&<button className="btn-primary" style={{fontSize:12,padding:"7px 14px"}} onClick={()=>setShowStmt(true)}>Submit Statement →</button>}
-              </div>
-            )}
-            {isReviewer&&counts.approved>0&&(
+            {isAdmin&&counts.approved>0&&(
               <button className="btn-primary" style={{fontSize:12,padding:"7px 14px"}} onClick={()=>setShowNS(true)}>Export to NetSuite →</button>
             )}
             <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 12px",background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)",cursor:"pointer"}} onClick={()=>setCurrentUser(null)}>
@@ -1109,10 +1255,8 @@ export default function App() {
         {/* TRANSACTIONS */}
         {activeTab==="transactions"&&(
           <>
-            {isCardholder&&myStmt==="submitted"&&<div className="alert-warning" style={{marginBottom:20,fontSize:13}}>⟳ Your statement is submitted and pending review by the finance team.</div>}
-            {isCardholder&&myStmt==="approved"&&<div className="alert-success" style={{marginBottom:20,fontSize:13}}>✓ Your statement has been approved and submitted to NetSuite.</div>}
-            {isCardholder&&myStmt==="open"&&myTxs.filter(t=>!t.receipt).length>0&&(
-              <div className="alert-error" style={{marginBottom:20,fontSize:13}}>⚠ {myTxs.filter(t=>!t.receipt).length} transaction{myTxs.filter(t=>!t.receipt).length>1?"s are":" is"} missing a receipt. Attach all before submitting.</div>
+            {isUser&&myTxs.filter(t=>!t.receipt).length>0&&(
+              <div className="alert-error" style={{marginBottom:20,fontSize:13}}>⚠ {myTxs.filter(t=>!t.receipt).length} transaction{myTxs.filter(t=>!t.receipt).length>1?"s are":" is"} missing a receipt.</div>
             )}
 
             {/* Stats */}
@@ -1131,11 +1275,11 @@ export default function App() {
               <div style={{flex:1}}>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--text3)",marginBottom:6}}>
                   <span>Review progress</span>
-                  <span>{counts.approved} / {isCardholder?myTxs.length:transactions.length} approved</span>
+                  <span>{counts.approved} / {isUser?myTxs.length:transactions.length} approved</span>
                 </div>
-                <div className="progress-bar"><div className="progress-fill" style={{width:`${(counts.approved/Math.max(isCardholder?myTxs.length:transactions.length,1))*100}%`}}/></div>
+                <div className="progress-bar"><div className="progress-fill" style={{width:`${(counts.approved/Math.max(isUser?myTxs.length:transactions.length,1))*100}%`}}/></div>
               </div>
-              <span style={{fontSize:12,color:"var(--text3)",fontFamily:"var(--mono)"}}>{Math.round((counts.approved/Math.max(isCardholder?myTxs.length:transactions.length,1))*100)}%</span>
+              <span style={{fontSize:12,color:"var(--text3)",fontFamily:"var(--mono)"}}>{Math.round((counts.approved/Math.max(isUser?myTxs.length:transactions.length,1))*100)}%</span>
             </div>
 
             {/* Toolbar */}
@@ -1155,15 +1299,21 @@ export default function App() {
                   return <option key={m} value={m}>{MONTHS[+mo-1]} {y}</option>;
                 })}
               </select>
-              {isReviewer&&(
+              {isAdmin&&(
                 <select value={filterUser} onChange={e=>setFilterUser(e.target.value)} style={{width:"auto",minWidth:160,fontSize:12}}>
-                  <option value="all">All cardholders</option>
-                  {users.filter(u=>u.role==="cardholder").map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+                  <option value="all">All users</option>
+                  {users.filter(u=>u.role==="user").map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              )}
+              {isAdmin&&(
+                <select value={filterCard} onChange={e=>setFilterCard(e.target.value)} style={{width:"auto",minWidth:160,fontSize:12}}>
+                  <option value="all">All cards</option>
+                  {cards.filter(c=>c.active).map(c=><option key={c.id} value={c.name}>{c.name} · {c.division}</option>)}
                 </select>
               )}
               <input type="text" placeholder="Search vendor or description..." value={search} onChange={e=>setSearch(e.target.value)} style={{width:220}}/>
               <div style={{marginLeft:"auto",display:"flex",gap:8}}>
-                {!stmtLocked&&<><button className="btn-secondary" style={{fontSize:12}} onClick={()=>csvRef.current.click()}>↑ Import CSV</button><input ref={csvRef} type="file" accept=".csv" style={{display:"none"}} onChange={e=>handleCSV(e.target.files[0])}/></>}
+                <button className="btn-secondary" style={{fontSize:12}} onClick={()=>setShowImport(true)}>↑ Import Statement</button>
               </div>
             </div>
             {csvErr&&<div className="alert-error" style={{marginBottom:12}}>{csvErr}</div>}
@@ -1171,7 +1321,7 @@ export default function App() {
             {/* Table */}
             <div className="card" style={{overflow:"hidden"}}>
               <div style={{display:"grid",gridTemplateColumns:"82px 1fr 1fr 96px 96px 110px 80px 80px 28px",padding:"10px 16px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em"}}>
-                <span>Date</span><span>Vendor</span><span>GL · Dept</span><span>Cardholder</span><span>Assignee</span><span style={{textAlign:"right"}}>Amount</span><span style={{textAlign:"center"}}>Receipt</span><span style={{textAlign:"center"}}>Status</span><span/>
+                <span>Date</span><span>Vendor</span><span>GL · Dept</span><span>User</span><span>Assignee</span><span style={{textAlign:"right"}}>Amount</span><span style={{textAlign:"center"}}>Receipt</span><span style={{textAlign:"center"}}>Status</span><span/>
               </div>
               <div style={{overflowY:"auto",maxHeight:"calc(100vh - 420px)"}}>
                 {vis.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--text3)",fontSize:13}}>No transactions match your filters.</div>}
@@ -1216,7 +1366,7 @@ export default function App() {
               </div>
             </div>
 
-            {isReviewer&&counts.submitted>0&&(
+            {isAdmin&&counts.submitted>0&&(
               <div style={{marginTop:14}}>
                 <button className="btn-success" style={{fontSize:12}} onClick={()=>setTransactions(prev=>prev.map(t=>t.status==="submitted"?{...t,status:"approved"}:t))}>
                   ✓ Approve All Submitted ({counts.submitted})
@@ -1268,7 +1418,7 @@ export default function App() {
                       setUnmappedReceipts(prev=>prev.filter(x=>x.name!==r.name));
                     }} style={{fontSize:12}}>
                       <option value="">— Assign to transaction —</option>
-                      {(isCardholder?myTxs:transactions).filter(t=>!t.receipt).map(t=>(
+                      {(isUser?myTxs:transactions).filter(t=>!t.receipt).map(t=>(
                         <option key={t.id} value={t.id}>{fmtDate(t.date)} · {t.vendor} · {fmt(t.amount)}</option>
                       ))}
                     </select>
@@ -1280,7 +1430,7 @@ export default function App() {
 
             <div className="card" style={{overflow:"hidden"}}>
               <div style={{padding:"12px 16px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em"}}>Receipt Status · All Transactions</div>
-              {(isCardholder?myTxs:transactions).map(t=>(
+              {(isUser?myTxs:transactions).map(t=>(
                 <div key={t.id} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",borderBottom:"1px solid var(--border)"}}>
                   <div style={{flex:1}}>
                     <div style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{t.vendor}</div>
@@ -1302,9 +1452,12 @@ export default function App() {
         {activeTab==="users"&&isAdmin&&<UserMgmt users={users} onUpdate={setUsers}/>}
 
         {/* SETTINGS */}
-        {activeTab==="settings"&&!isCardholder&&(
-          <div style={{maxWidth:620}}>
+        {activeTab==="settings"&&isAdmin&&(
+          <div style={{maxWidth:660}}>
             <div style={{fontSize:18,fontWeight:700,color:"var(--text)",letterSpacing:"-0.02em",marginBottom:24}}>Settings</div>
+
+            {/* ── CREDIT CARDS ── */}
+            <CreditCardSettings cards={cards} onUpdate={setCards}/>
 
             <div className="card" style={{padding:24,marginBottom:16}}>
               <div style={{fontSize:14,fontWeight:600,color:"var(--text)",marginBottom:4}}>Chart of Accounts</div>
@@ -1370,7 +1523,7 @@ export default function App() {
               <button className="btn-secondary" style={{fontSize:12}} onClick={()=>{
                 const vendor=prompt("Vendor keyword (lowercase):");
                 if(!vendor)return;
-                setVendorAssignees(a=>({...a,[vendor.toLowerCase()]:users.find(u=>u.role==="cardholder")?.id||""}));
+                setVendorAssignees(a=>({...a,[vendor.toLowerCase()]:users.find(u=>u.role==="user")?.id||""}));
               }}>+ Add Rule</button>
             </div>
 
@@ -1405,9 +1558,10 @@ export default function App() {
       </div>
 
       {/* OVERLAYS */}
-      {selectedTx&&<TxDrawer tx={selectedTx} glAccounts={glAccounts} currentUser={currentUser} allUsers={users} onUpdate={update} onClose={()=>setSelectedTxId(null)} locked={isCardholder&&stmtLocked}/>}
+      {selectedTx&&<TxDrawer tx={selectedTx} glAccounts={glAccounts} currentUser={currentUser} allUsers={users} onUpdate={update} onClose={()=>setSelectedTxId(null)} locked={isUser&&stmtLocked}/>}
       {showStmt&&<StatementModal myTxs={myTxs} onConfirm={submitStmt} onClose={()=>setShowStmt(false)}/>}
-      {showMatcher&&<ReceiptMatcher receipts={uploadedReceipts} rawFiles={rawFiles} transactions={isCardholder?myTxs:transactions} onConfirm={handleMatchConfirm} onClose={()=>setShowMatcher(false)}/>}
+      {showMatcher&&<ReceiptMatcher receipts={uploadedReceipts} rawFiles={rawFiles} transactions={isUser?myTxs:transactions} onConfirm={handleMatchConfirm} onClose={()=>setShowMatcher(false)}/>}
+      {showImport&&<ImportModal cards={cards} currentUser={currentUser} onImport={handleImport} onClose={()=>setShowImport(false)}/>}
       {showNS&&<NSModal transactions={transactions} onClose={()=>setShowNS(false)} onDone={handleExportDone}/>}
       {showGL&&<GLSettings glAccounts={glAccounts} onSave={setGlAccounts} onClose={()=>setShowGL(false)}/>}
     </div>
