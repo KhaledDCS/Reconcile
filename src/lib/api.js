@@ -1,13 +1,19 @@
 import { supabase } from './supabase';
+function parseCard(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string' && raw.startsWith('[')) { try { const p = JSON.parse(raw); return Array.isArray(p) ? p : []; } catch {} }
+  return raw ? [raw] : [];
+}
 export async function getUsers() {
   const { data, error } = await supabase.from('users').select('*').order('created_at');
   if (error) throw error;
-  return data.map(u => ({ id: u.id, name: u.name, email: u.email, password: u.password, role: u.role, active: u.active, card: u.card, createdAt: u.created_at }));
+  return data.map(u => ({ id: u.id, name: u.name, email: u.email, password: u.password, role: u.role, active: u.active, card: parseCard(u.card), createdAt: u.created_at }));
 }
 export async function loginUser(email, password) {
   const { data, error } = await supabase.from('users').select('*').eq('email', email).eq('password', password).eq('active', true).single();
   if (error) return null;
-  return data;
+  return { ...data, card: parseCard(data.card) };
 }
 export async function createUser(user) {
   const id = 'u' + Date.now();
@@ -19,10 +25,20 @@ export async function updateUser(id, changes) {
   const { error } = await supabase.from('users').update(changes).eq('id', id);
   if (error) throw error;
 }
+export async function uploadReceiptFile(file, txId) {
+  const ext = file.name.split('.').pop() || 'pdf';
+  const path = `${txId}/${Date.now()}.${ext}`;
+  // Ensure bucket exists (ignore error if already exists)
+  await supabase.storage.createBucket('receipts', { public: true }).catch(() => {});
+  const { error } = await supabase.storage.from('receipts').upload(path, file, { upsert: true });
+  if (error) { console.error('[uploadReceiptFile] Storage error:', error); throw error; }
+  const { data } = supabase.storage.from('receipts').getPublicUrl(path);
+  return data.publicUrl;
+}
 export async function attachReceipt(transactionId, receipt) {
   await supabase.from('receipts').delete().eq('transaction_id', transactionId);
   const { error } = await supabase.from('receipts').insert({ transaction_id: transactionId, name: receipt.name, size: receipt.size, url: receipt.url, receipt_match: receipt.receiptMatch || null });
-  if (error) throw error;
+  if (error) { console.error('[attachReceipt] DB error:', error); throw error; }
 }
 export async function removeReceipt(transactionId) {
   const { error } = await supabase.from('receipts').delete().eq('transaction_id', transactionId);
@@ -56,7 +72,8 @@ export async function getTransactions() {
     amount: parseFloat(t.amount), card: t.card, userId: t.user_id,
     categoryId: t.category_id, categoryName: t.category_name, dept: t.dept,
     confidence: t.confidence, autoAssigned: t.auto_assigned, isRecurring: t.is_recurring,
-    assigneeId: t.assignee_id, autoAssignee: t.auto_assignee, status: t.status,
+    assigneeId: t.assignee_id, autoAssignee: t.auto_assignee,
+    status: t.status === 'exported' ? 'exported' : (t.receipts?.[0] ? 'ready' : 'pending'),
     memo: t.memo, flagReason: t.flag_reason, reconId: t.recon_id,
     receipt: t.receipts?.[0] ? { name: t.receipts[0].name, size: t.receipts[0].size, url: t.receipts[0].url } : null,
     receiptMatch: t.receipts?.[0]?.receipt_match || null

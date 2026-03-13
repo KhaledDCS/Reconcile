@@ -127,16 +127,16 @@ const CSS = `
 
 // ── DATA ──────────────────────────────────────────────────────────────────────
 const INITIAL_USERS = [
-  { id: "u1", name: "Admin User",  email: "admin@company.com",  password: "admin123", role: "admin", active: true, card: null,         createdAt: "2025-01-01" },
-  { id: "u2", name: "Jordan Lee",  email: "jordan@company.com", password: "pass123",  role: "user",  active: true, card: "Visa ••4291", createdAt: "2025-01-10" },
-  { id: "u3", name: "Alex Kim",    email: "alex@company.com",   password: "pass123",  role: "user",  active: true, card: "Amex ••8812", createdAt: "2025-01-10" },
-  { id: "u4", name: "Morgan Chen", email: "morgan@company.com", password: "pass123",  role: "user",  active: true, card: "Visa ••4291", createdAt: "2025-01-15" },
-  { id: "u5", name: "Sam Rivera",  email: "sam@company.com",    password: "pass123",  role: "user",  active: true, card: null,         createdAt: "2025-01-05" },
+  { id: "u1", name: "Admin User",  email: "admin@company.com",  password: "admin123", role: "admin", active: true, createdAt: "2025-01-01" },
+  { id: "u2", name: "Jordan Lee",  email: "jordan@company.com", password: "pass123",  role: "user",  active: true, createdAt: "2025-01-10" },
+  { id: "u3", name: "Alex Kim",    email: "alex@company.com",   password: "pass123",  role: "user",  active: true, createdAt: "2025-01-10" },
+  { id: "u4", name: "Morgan Chen", email: "morgan@company.com", password: "pass123",  role: "user",  active: true, createdAt: "2025-01-15" },
+  { id: "u5", name: "Sam Rivera",  email: "sam@company.com",    password: "pass123",  role: "user",  active: true, createdAt: "2025-01-05" },
 ];
 
 const INITIAL_CARDS = [
-  { id: "c1", name: "Visa ••4291",  network: "Visa",  last4: "4291", division: "Engineering", active: true },
-  { id: "c2", name: "Amex ••8812",  network: "Amex",  last4: "8812", division: "Operations",  active: true },
+  { id: "c1", name: "Visa ••4291",  network: "Visa",  last4: "4291", division: "Engineering", active: true  },
+  { id: "c2", name: "Amex ••8812",  network: "Amex",  last4: "8812", division: "Operations",  active: true  },
   { id: "c3", name: "MC ••3301",    network: "MC",    last4: "3301", division: "Sales",        active: false },
 ];
 
@@ -268,7 +268,7 @@ function RoleTag({ role }) {
 }
 
 function StatusTag({ status }) {
-  const m={pending:["tag-amber","● Pending"],submitted:["tag-blue","↑ Submitted"],approved:["tag-green","✓ Approved"],flagged:["tag-red","⚑ Flagged"],exported:["tag-gray","→ Exported"]};
+  const m={pending:["tag-amber","⚠ Missing Receipt"],ready:["tag-blue","📎 Receipt Attached"],exported:["tag-green","✓ Exported"]};
   const [cls,label]=m[status]||["tag-gray",status];
   return <span className={`tag ${cls}`}>{label}</span>;
 }
@@ -440,9 +440,9 @@ function AccountSettingsModal({ currentUser, onClose, onPasswordChanged }) {
 const SPECIAL_RE = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/;
 const sanitizeInput = s => String(s).replace(/[<>"'`;]/g,"").trim();
 
-function UserMgmt({ users, onUpdate }) {
+function UserMgmt({ users, onUpdate, cards }) {
   const [showAdd,setShowAdd]=useState(false);
-  const [form,setForm]=useState({name:"",email:"",password:"",role:"user",card:""});
+  const [form,setForm]=useState({name:"",email:"",password:"",role:"user",card:[]});
   const [addErr,setAddErr]=useState("");
   const [editId,setEditId]=useState(null);
   const [editForm,setEditForm]=useState({});
@@ -472,10 +472,10 @@ function UserMgmt({ users, onUpdate }) {
         email: sanitizeInput(form.email).toLowerCase(),
         password: sanitizeInput(form.password),
         role: form.role,
-        card: sanitizeInput(form.card),
+        card: form.card.length ? JSON.stringify(form.card) : null,
       });
-      onUpdate([...users,{...newUser,createdAt:newUser.created_at}]);
-      setForm({name:"",email:"",password:"",role:"user",card:""});
+      onUpdate([...users,{...newUser,createdAt:newUser.created_at,card:form.card}]);
+      setForm({name:"",email:"",password:"",role:"user",card:[]});
       setShowAdd(false);setAddErr("");
     }catch(e){setAddErr("Failed to create user.");}
     setSaving(false);
@@ -489,7 +489,7 @@ function UserMgmt({ users, onUpdate }) {
         name: sanitizeInput(editForm.name),
         email: sanitizeInput(editForm.email).toLowerCase(),
         role: editForm.role,
-        card: sanitizeInput(editForm.card||""),
+        card: editForm.card?.length ? JSON.stringify(editForm.card) : null,
       });
       onUpdate(users.map(u=>u.id===editId?{...u,...editForm,email:sanitizeInput(editForm.email).toLowerCase()}:u));
       setEditId(null);setEditErr("");
@@ -539,8 +539,8 @@ function UserMgmt({ users, onUpdate }) {
               <Av name={u.name} color={ROLE_COLOR[u.role]} size={32}/>
               <div>
                 <div style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{u.name}</div>
-                <div style={{display:"flex",gap:6,alignItems:"center",marginTop:2}}>
-                  {u.card&&<span style={{fontSize:11,color:"var(--text3)",fontFamily:"var(--mono)"}}>{u.card}</span>}
+                <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap",marginTop:2}}>
+                  {(Array.isArray(u.card)?u.card:[]).map((c,i)=><span key={i} style={{fontSize:10,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:3,padding:"1px 5px"}}>{c}</span>)}
                   {!u.active&&<span className="tag tag-red" style={{fontSize:9}}>Inactive</span>}
                 </div>
               </div>
@@ -550,7 +550,7 @@ function UserMgmt({ users, onUpdate }) {
               <RoleTag role={u.role}/>
             </div>
             <div style={{alignSelf:"center",display:"flex",gap:6,justifyContent:"flex-end"}}>
-              <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px"}} title="Edit user" onClick={()=>{setEditId(u.id);setEditForm({name:u.name,email:u.email,role:u.role,card:u.card||""});}}>✎</button>
+              <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px"}} title="Edit user" onClick={()=>{setEditId(u.id);setEditForm({name:u.name,email:u.email,role:u.role,card:Array.isArray(u.card)?u.card:(u.card?[u.card]:[])});}}>✎</button>
               <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px"}} title="Reset password" onClick={()=>{setResetId(u.id);setResetPw("");setResetErr("");setResetOk(false);}}>🔑</button>
               <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px",color:u.active?"var(--red)":"var(--green)"}} title={u.active?"Deactivate":"Activate"} onClick={async()=>{await api.updateUser(u.id,{active:!u.active});onUpdate(users.map(x=>x.id===u.id?{...x,active:!x.active}:x));}}>
                 {u.active?"⊘":"✓"}
@@ -569,7 +569,7 @@ function UserMgmt({ users, onUpdate }) {
               <button className="btn-ghost" onClick={()=>{setShowAdd(false);setAddErr("");}}>✕</button>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:18}}>
-              {[{l:"Full Name",k:"name",t:"text",p:"Jane Smith"},{l:"Email",k:"email",t:"email",p:"jane@company.com"},{l:"Password",k:"password",t:"password",p:"Min 6 chars + special character"},{l:"Card (optional)",k:"card",t:"text",p:"Visa ••1234"}].map(f=>(
+              {[{l:"Full Name",k:"name",t:"text",p:"Jane Smith"},{l:"Email",k:"email",t:"email",p:"jane@company.com"},{l:"Password",k:"password",t:"password",p:"Min 6 chars + special character"}].map(f=>(
                 <div key={f.k} className="input-group">
                   <label className="input-label">{f.l}</label>
                   <input type={f.t} value={form[f.k]} placeholder={f.p} onChange={e=>setForm(p=>({...p,[f.k]:e.target.value}))}/>
@@ -581,6 +581,26 @@ function UserMgmt({ users, onUpdate }) {
                   <option value="user">User</option>
                   <option value="admin">Admin</option>
                 </select>
+              </div>
+              <div className="input-group">
+                <label className="input-label">Assigned Cards (optional)</label>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {(cards||[]).filter(c=>c.active).length===0&&<span style={{fontSize:12,color:"var(--text3)"}}>No active cards</span>}
+                  {(cards||[]).filter(c=>c.active).map(c=>{
+                    const sel=form.card.includes(c.name);
+                    const nc=c.network==='Visa'?'#0070d2':c.network==='Amex'?'#0f766e':c.network==='Mastercard'?'#d97706':'#706e6b';
+                    return (
+                      <div key={c.id} onClick={()=>setForm(p=>({...p,card:sel?p.card.filter(x=>x!==c.name):[...p.card,c.name]}))} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",border:`1.5px solid ${sel?"var(--primary)":"var(--border)"}`,borderRadius:8,cursor:"pointer",background:sel?"rgba(0,112,210,0.04)":"var(--surface)",userSelect:"none",transition:"border-color 0.1s,background 0.1s"}}>
+                        <div style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${sel?"var(--primary)":"var(--border)"}`,background:sel?"var(--primary)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:10,color:"#fff",fontWeight:700,lineHeight:1}}>{sel&&"✓"}</div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:600,color:"var(--text)",fontFamily:"var(--mono)"}}>{c.name}</div>
+                          <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>{c.division}</div>
+                        </div>
+                        <span style={{fontSize:9,fontWeight:700,letterSpacing:"0.07em",color:nc,background:nc+'18',padding:"3px 7px",borderRadius:4,textTransform:"uppercase"}}>{c.network}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
             {addErr&&<div className="alert-error" style={{marginBottom:14}}>⚠ {addErr}</div>}
@@ -601,7 +621,7 @@ function UserMgmt({ users, onUpdate }) {
               <button className="btn-ghost" onClick={()=>{setEditId(null);setEditErr("");}}>✕</button>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:18}}>
-              {[{l:"Full Name",k:"name",t:"text"},{l:"Email",k:"email",t:"email"},{l:"Card (optional)",k:"card",t:"text",p:"Visa ••1234"}].map(f=>(
+              {[{l:"Full Name",k:"name",t:"text"},{l:"Email",k:"email",t:"email"}].map(f=>(
                 <div key={f.k} className="input-group">
                   <label className="input-label">{f.l}</label>
                   <input type={f.t} value={editForm[f.k]||""} placeholder={f.p||""} onChange={e=>setEditForm(p=>({...p,[f.k]:e.target.value}))}/>
@@ -613,6 +633,26 @@ function UserMgmt({ users, onUpdate }) {
                   <option value="user">User</option>
                   <option value="admin">Admin</option>
                 </select>
+              </div>
+              <div className="input-group">
+                <label className="input-label">Assigned Cards (optional)</label>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {(cards||[]).filter(c=>c.active).length===0&&<span style={{fontSize:12,color:"var(--text3)"}}>No active cards</span>}
+                  {(cards||[]).filter(c=>c.active).map(c=>{
+                    const sel=(editForm.card||[]).includes(c.name);
+                    const nc=c.network==='Visa'?'#0070d2':c.network==='Amex'?'#0f766e':c.network==='Mastercard'?'#d97706':'#706e6b';
+                    return (
+                      <div key={c.id} onClick={()=>setEditForm(p=>({...p,card:sel?(p.card||[]).filter(x=>x!==c.name):[...(p.card||[]),c.name]}))} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",border:`1.5px solid ${sel?"var(--primary)":"var(--border)"}`,borderRadius:8,cursor:"pointer",background:sel?"rgba(0,112,210,0.04)":"var(--surface)",userSelect:"none",transition:"border-color 0.1s,background 0.1s"}}>
+                        <div style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${sel?"var(--primary)":"var(--border)"}`,background:sel?"var(--primary)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:10,color:"#fff",fontWeight:700,lineHeight:1}}>{sel&&"✓"}</div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:600,color:"var(--text)",fontFamily:"var(--mono)"}}>{c.name}</div>
+                          <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>{c.division}</div>
+                        </div>
+                        <span style={{fontSize:9,fontWeight:700,letterSpacing:"0.07em",color:nc,background:nc+'18',padding:"3px 7px",borderRadius:4,textTransform:"uppercase"}}>{c.network}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
             {editErr&&<div className="alert-error" style={{marginBottom:14}}>⚠ {editErr}</div>}
@@ -923,10 +963,18 @@ function TxDrawer({ tx, currentUser, allUsers, onUpdate, onClose, locked }) {
   const [local,setLocal]=useState({...tx});
   const fileRef=useRef();
   const isAdmin=currentUser.role==="admin";
-  const canEdit=!locked||(isAdmin&&tx.status==="submitted");
+  const canEdit=local.status!=="exported";
 
-  const save=()=>{onUpdate(local.id,local);onClose();};
-  const handleFile=(file)=>{if(!file)return;setLocal(t=>({...t,receipt:{name:file.name,size:file.size,url:URL.createObjectURL(file)}}));};
+  const save=async()=>{
+    let finalLocal=local;
+    if(local.receipt?._file){
+      try{const url=await api.uploadReceiptFile(local.receipt._file,local.id);finalLocal={...local,receipt:{name:local.receipt.name,size:local.receipt.size,url}};}
+      catch(e){console.error('[save] Upload failed:',e);}
+    }
+    try{await onUpdate(finalLocal.id,finalLocal);}catch(e){console.error('[save] DB save failed:',e);}
+    onClose();
+  };
+  const handleFile=(file)=>{if(!file)return;setLocal(t=>({...t,status:"ready",receipt:{name:file.name,size:file.size,url:URL.createObjectURL(file),_file:file}}));};
 
   return(
     <div style={{position:"fixed",inset:0,zIndex:90,display:"flex"}}>
@@ -983,7 +1031,8 @@ function TxDrawer({ tx, currentUser, allUsers, onUpdate, onClose, locked }) {
                   <div style={{fontSize:11,color:"var(--text3)"}}>{(local.receipt.size/1024).toFixed(0)} KB</div>
                 </div>
                 {local.receiptMatch&&<span className="tag tag-ai">⚡ AI</span>}
-                {canEdit&&<button className="btn-ghost" style={{color:"var(--red)",fontSize:11}} onClick={()=>setLocal(t=>({...t,receipt:null}))}>Remove</button>}
+                {local.receipt.url&&!local.receipt.url.startsWith("blob:")&&<a href={local.receipt.url} target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{fontSize:11,textDecoration:"none"}}>View</a>}
+                {canEdit&&<button className="btn-ghost" style={{color:"var(--red)",fontSize:11}} onClick={()=>setLocal(t=>({...t,receipt:null,status:"pending"}))}>Remove</button>}
               </div>
             ):canEdit?(
               <div className="drop-zone" style={{padding:"24px",textAlign:"center"}} onClick={()=>fileRef.current.click()}
@@ -998,23 +1047,19 @@ function TxDrawer({ tx, currentUser, allUsers, onUpdate, onClose, locked }) {
               <div style={{fontSize:12,color:"var(--red)",fontFamily:"var(--mono)"}}>No receipt attached</div>
             )}
             <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
+            {/* Receipt preview */}
+            {local.receipt?.url&&(
+              <div style={{marginTop:10,borderRadius:8,overflow:"hidden",border:"1px solid var(--border)",background:"var(--surface2)"}}>
+                {/\.(jpe?g|png|gif|webp)$/i.test(local.receipt.name||"")?
+                  <img src={local.receipt.url} alt="Receipt preview" style={{width:"100%",maxHeight:260,objectFit:"contain",display:"block"}}/>:
+                  <iframe src={local.receipt.url} title="Receipt preview" style={{width:"100%",height:260,border:"none",display:"block"}}/>
+                }
+              </div>
+            )}
           </div>
-
-          {isAdmin&&local.status==="submitted"&&(
-            <div>
-              <span className="sidebar-label">Flag reason (if rejecting)</span>
-              <input value={local.flagReason} onChange={e=>setLocal(t=>({...t,flagReason:e.target.value}))} placeholder="e.g. Wrong GL, missing memo..."/>
-            </div>
-          )}
         </div>
 
         <div style={{padding:"16px 24px",borderTop:"1px solid var(--border)",display:"flex",gap:8,flexWrap:"wrap"}}>
-          {isAdmin&&local.status==="submitted"&&(
-            <>
-              <button className="btn-success" style={{flex:1}} onClick={()=>{setLocal(t=>({...t,status:"approved"}));setTimeout(save,50);}}>✓ Approve</button>
-              <button className="btn-danger" style={{flex:1}} onClick={()=>{setLocal(t=>({...t,status:"flagged"}));setTimeout(save,50);}}>⚑ Flag</button>
-            </>
-          )}
           {canEdit&&<button className="btn-secondary" style={{flex:1}} onClick={save}>Save</button>}
           {!canEdit&&<button className="btn-secondary" style={{flex:1}} onClick={onClose}>Close</button>}
         </div>
@@ -1143,31 +1188,50 @@ function CreditCardSettings({ cards, onUpdate }) {
       )}
 
       {/* Cards list */}
-      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {cards.map(c=>(
-          <div key={c.id} style={{display:"grid",gridTemplateColumns:"40px 1fr 120px 100px 90px",gap:12,alignItems:"center",padding:"12px 14px",background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)",opacity:c.active?1:0.5}}>
-            <div style={{width:32,height:32,borderRadius:8,background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>
-              {c.network==="Visa"?"💳":c.network==="Amex"?"🟦":c.network==="Mastercard"?"🔴":"💳"}
-            </div>
+      <div style={{border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
+        <div style={{display:"grid",gridTemplateColumns:"32px 1fr 70px 60px 120px 70px auto",gap:12,padding:"8px 14px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em",alignItems:"center"}}>
+          <span/>
+          <span>Card</span>
+          <span>Network</span>
+          <span>Last 4</span>
+          <span>Division</span>
+          <span>Status</span>
+          <span style={{textAlign:"right"}}>Actions</span>
+        </div>
+        {cards.map((c,i)=>(
+          <div key={c.id} style={{borderBottom:i<cards.length-1?"1px solid var(--border)":"none",opacity:c.active?1:0.5}}>
             {editId===c.id?(
-              <>
-                <input value={editForm.name} onChange={e=>setEditForm(p=>({...p,name:e.target.value}))} style={{fontSize:12}} placeholder="Card name"/>
-                <input value={editForm.division} onChange={e=>setEditForm(p=>({...p,division:e.target.value}))} style={{fontSize:12}} placeholder="Division"/>
-                <button className="btn-success" style={{fontSize:11,padding:"5px 10px"}} onClick={saveEdit} disabled={saving}>{saving?"…":"Save"}</button>
-                <button className="btn-ghost" style={{fontSize:11}} onClick={()=>setEditId(null)}>Cancel</button>
-              </>
-            ):(
-              <>
-                <div>
-                  <div style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{c.name}</div>
-                  <div style={{fontSize:11,color:"var(--text3)"}}>{c.network} · ••{c.last4} · {c.active?"Active":"Inactive"}</div>
+              <div style={{display:"grid",gridTemplateColumns:"32px 1fr 70px 60px 120px 70px auto",gap:12,padding:"10px 14px",alignItems:"center",background:"var(--accent-dim)"}}>
+                <div style={{width:28,height:28,borderRadius:6,background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>
+                  {c.network==="Visa"?"💳":c.network==="Amex"?"🟦":c.network==="Mastercard"?"🔴":"💳"}
                 </div>
-                <span style={{fontSize:12,background:"var(--accent-dim)",color:"var(--accent)",borderRadius:6,padding:"3px 10px",border:"1px solid var(--accent-border)",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.division||"—"}</span>
-                <button className="btn-ghost" style={{fontSize:11}} onClick={()=>startEdit(c)}>✎ Edit</button>
-                <button className={c.active?"btn-danger":"btn-success"} style={{fontSize:11,padding:"5px 10px"}} onClick={()=>toggleActive(c)}>
-                  {c.active?"Deactivate":"Activate"}
-                </button>
-              </>
+                <input value={editForm.name} onChange={e=>setEditForm(p=>({...p,name:e.target.value}))} style={{fontSize:12}} placeholder="Card name"/>
+                <span style={{fontSize:12,color:"var(--text3)"}}>{c.network}</span>
+                <span style={{fontSize:12,color:"var(--text3)",fontFamily:"var(--mono)"}}>••{c.last4}</span>
+                <input value={editForm.division} onChange={e=>setEditForm(p=>({...p,division:e.target.value}))} style={{fontSize:12}} placeholder="Division"/>
+                <span/>
+                <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
+                  <button className="btn-success" style={{fontSize:11,padding:"5px 10px"}} onClick={saveEdit} disabled={saving}>{saving?"…":"Save"}</button>
+                  <button className="btn-ghost" style={{fontSize:11}} onClick={()=>setEditId(null)}>Cancel</button>
+                </div>
+              </div>
+            ):(
+              <div style={{display:"grid",gridTemplateColumns:"32px 1fr 70px 60px 120px 70px auto",gap:12,padding:"11px 14px",alignItems:"center"}}>
+                <div style={{width:28,height:28,borderRadius:6,background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>
+                  {c.network==="Visa"?"💳":c.network==="Amex"?"🟦":c.network==="Mastercard"?"🔴":"💳"}
+                </div>
+                <span style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{c.name}</span>
+                <span style={{fontSize:12,color:"var(--text2)"}}>{c.network}</span>
+                <span style={{fontSize:12,color:"var(--text2)",fontFamily:"var(--mono)"}}>••{c.last4}</span>
+                <span style={{fontSize:12,background:"var(--accent-dim)",color:"var(--accent)",borderRadius:6,padding:"2px 8px",border:"1px solid var(--accent-border)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.division||"—"}</span>
+                <span className={c.active?"tag tag-green":"tag tag-gray"} style={{fontSize:10}}>{c.active?"Active":"Inactive"}</span>
+                <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
+                  <button className="btn-ghost" style={{fontSize:11,padding:"4px 10px"}} onClick={()=>startEdit(c)}>✎ Edit</button>
+                  <button className={c.active?"btn-danger":"btn-success"} style={{fontSize:11,padding:"4px 10px"}} onClick={()=>toggleActive(c)}>
+                    {c.active?"Deactivate":"Activate"}
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         ))}
@@ -1265,7 +1329,7 @@ function NSModal({ transactions, onClose, onDone }) {
   const [step,setStep]=useState(0);
   const [reconId]=useState(genReconId);
   const [ts]=useState(()=>new Date().toISOString());
-  const approved=transactions.filter(t=>t.status==="approved");
+  const approved=transactions.filter(t=>t.status==="ready");
   const total=approved.reduce((s,t)=>s+t.amount,0);
   const wReceipts=approved.filter(t=>t.receipt).length;
 
@@ -1439,19 +1503,43 @@ export default function App() {
     setShowMatcher(true);
   };
 
-  const handleMatchConfirm=(matches)=>{
+  const handleMatchConfirm=async(matches)=>{
     const mapped=new Set();
+    const resolved={}; // name -> permanent url
+    for(const [name,matchData] of Object.entries(matches)){
+      if(!matchData.txId)continue;
+      const r=uploadedReceipts.find(x=>x.name===name);
+      if(!r)continue;
+      const rawFile=rawFiles.find(f=>f.name===name);
+      let url=r.url;
+      if(rawFile){try{url=await api.uploadReceiptFile(rawFile,matchData.txId);}catch(e){}}
+      resolved[name]=url;
+      mapped.add(name);
+    }
+    // Persist matched receipts to DB
+    await Promise.all(Object.entries(matches).filter(([,v])=>v.txId).map(async([name,matchData])=>{
+      const r=uploadedReceipts.find(x=>x.name===name);
+      if(r)await api.attachReceipt(matchData.txId,{name:r.name,size:r.size,url:resolved[name]||r.url,receiptMatch:matchData.confidence}).catch(()=>{});
+    }));
     setTransactions(prev=>prev.map(t=>{
       const match=Object.entries(matches).find(([,v])=>v.txId===t.id);
       if(!match)return t;
       const r=uploadedReceipts.find(r=>r.name===match[0]);
-      if(r)mapped.add(r.name);
-      return r?{...t,receipt:{name:r.name,size:r.size,url:r.url},receiptMatch:match[1].confidence}:t;
+      if(!r)return t;
+      return {...t,receipt:{name:r.name,size:r.size,url:resolved[r.name]||r.url},receiptMatch:match[1].confidence};
     }));
-    // persist receipts that were left unmapped
-    const leftover=uploadedReceipts.filter(r=>!mapped.has(r.name));
+    // persist receipts that were left unmapped (keep raw File for re-matching)
+    const leftover=uploadedReceipts.filter(r=>!mapped.has(r.name)).map(r=>({...r,file:rawFiles.find(f=>f.name===r.name)||null}));
     setUnmappedReceipts(prev=>{const names=new Set(prev.map(x=>x.name));return [...prev,...leftover.filter(x=>!names.has(x.name))];});
     setShowMatcher(false);
+  };
+
+  const handleRematch=()=>{
+    const files=unmappedReceipts.map(r=>r.file).filter(Boolean);
+    if(!files.length)return;
+    setRawFiles(files);
+    setUploadedReceipts(unmappedReceipts.map(({name,size,url})=>({name,size,url})));
+    setShowMatcher(true);
   };
 
   const handleExportDone=async (record)=>{
@@ -1471,8 +1559,13 @@ export default function App() {
   // derive available months from all transactions
   const availableMonths = [...new Set(transactions.map(t=>t.date.slice(0,7)))].sort();
 
+  // derive filterable cards based on role
+  const userCardArr = isUser ? (Array.isArray(currentUser?.card) ? currentUser.card : (currentUser?.card ? [currentUser.card] : [])) : [];
+  const filterableCards = isAdmin ? cards.filter(c=>c.active) : cards.filter(c=>userCardArr.includes(c.name));
+
   const vis=transactions.filter(t=>{
     if(isUser&&t.userId!==currentUser.id)return false;
+    if(isUser&&userCardArr.length&&!userCardArr.includes(t.card))return false;
     if(filterStatus!=="all"&&t.status!==filterStatus)return false;
     if(filterUser!=="all"&&t.userId!==filterUser)return false;
     if(filterCard!=="all"&&t.card!==filterCard)return false;
@@ -1483,14 +1576,12 @@ export default function App() {
 
   const counts={
     all:isUser?myTxs.length:transactions.length,
-    pending:transactions.filter(t=>t.status==="pending"&&(isUser?t.userId===currentUser?.id:true)).length,
-    submitted:transactions.filter(t=>t.status==="submitted").length,
-    approved:transactions.filter(t=>t.status==="approved").length,
-    flagged:transactions.filter(t=>t.status==="flagged"&&(isUser?t.userId===currentUser?.id:true)).length,
+    pending:(isUser?myTxs:transactions).filter(t=>t.status==="pending").length,
+    ready:(isUser?myTxs:transactions).filter(t=>t.status==="ready").length,
     exported:transactions.filter(t=>t.status==="exported").length,
   };
 
-  const approvedAmt=transactions.filter(t=>t.status==="approved").reduce((s,t)=>s+t.amount,0);
+  const readyAmt=(isUser?myTxs:transactions).filter(t=>t.status==="ready").reduce((s,t)=>s+t.amount,0);
   const totalAmt=vis.reduce((s,t)=>s+t.amount,0);
   const selectedTx=transactions.find(t=>t.id===selectedTxId);
 
@@ -1499,6 +1590,7 @@ export default function App() {
     if(u){
       const session={...u,role:u.role,name:u.name,id:u.id,card:u.card};
       setCurrentUser(session);
+      setActiveTab("transactions");
       try{localStorage.setItem("recon_session",JSON.stringify(session));}catch(e){}
     }
     return u;
@@ -1539,7 +1631,7 @@ export default function App() {
             {tabs.map(t=><button key={t} className={`nav-tab ${activeTab===t?"active":""}`} onClick={()=>setActiveTab(t)}>{tabLabel[t]}</button>)}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10,paddingLeft:16,flexShrink:0}}>
-            {isAdmin&&counts.approved>0&&(
+            {isAdmin&&counts.ready>0&&(
               <button className="btn-primary" style={{fontSize:12,padding:"7px 14px"}} onClick={()=>setShowNS(true)}>Export to NetSuite →</button>
             )}
             <div style={{position:"relative"}}>
@@ -1581,7 +1673,7 @@ export default function App() {
 
             {/* Stats */}
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(148px,1fr))",gap:12,marginBottom:24}}>
-              {[{l:"Total",v:fmt(totalAmt),s:`${vis.length} transactions`},{l:"Pending",v:counts.pending,s:"to review",c:"var(--amber)"},{l:"In Review",v:counts.submitted,s:"submitted",c:"var(--accent)"},{l:"Approved",v:fmt(approvedAmt),s:`${counts.approved} lines`,c:"var(--green)"},{l:"Flagged",v:counts.flagged,s:"need attention",c:"var(--red)"},{l:"Recurring",v:vis.filter(t=>t.isRecurring).length,s:"subscriptions",c:"var(--purple)"}].map(s=>(
+              {[{l:"Total",v:fmt(totalAmt),s:`${vis.length} transactions`},{l:"Missing Receipt",v:counts.pending,s:"need upload",c:"var(--amber)"},{l:"Receipt Attached",v:fmt(readyAmt),s:`${counts.ready} ready`,c:"var(--accent)"},{l:"Exported",v:counts.exported,s:"to NetSuite",c:"var(--green)"},{l:"Recurring",v:vis.filter(t=>t.isRecurring).length,s:"subscriptions",c:"var(--purple)"}].map(s=>(
                 <div key={s.l} className="stat-card">
                   <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>{s.l}</div>
                   <div style={{fontSize:22,fontWeight:700,color:s.c||"var(--text)",letterSpacing:"-0.03em"}}>{s.v}</div>
@@ -1594,20 +1686,20 @@ export default function App() {
             <div className="card" style={{padding:"14px 18px",marginBottom:20,display:"flex",alignItems:"center",gap:16}}>
               <div style={{flex:1}}>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--text3)",marginBottom:6}}>
-                  <span>Review progress</span>
-                  <span>{counts.approved} / {isUser?myTxs.length:transactions.length} approved</span>
+                  <span>Receipt coverage</span>
+                  <span>{counts.ready+counts.exported} / {isUser?myTxs.length:transactions.length} with receipt</span>
                 </div>
-                <div className="progress-bar"><div className="progress-fill" style={{width:`${(counts.approved/Math.max(isUser?myTxs.length:transactions.length,1))*100}%`}}/></div>
+                <div className="progress-bar"><div className="progress-fill" style={{width:`${((counts.ready+counts.exported)/Math.max(isUser?myTxs.length:transactions.length,1))*100}%`}}/></div>
               </div>
-              <span style={{fontSize:12,color:"var(--text3)",fontFamily:"var(--mono)"}}>{Math.round((counts.approved/Math.max(isUser?myTxs.length:transactions.length,1))*100)}%</span>
+              <span style={{fontSize:12,color:"var(--text3)",fontFamily:"var(--mono)"}}>{Math.round(((counts.ready+counts.exported)/Math.max(isUser?myTxs.length:transactions.length,1))*100)}%</span>
             </div>
 
             {/* Toolbar */}
             <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
               <div style={{display:"flex",background:"var(--surface)",borderRadius:10,border:"1px solid var(--border)",overflow:"hidden"}}>
-                {["all","pending","submitted","approved","flagged","exported"].map(f=>(
+                {["all","pending","ready","exported"].map(f=>(
                   <button key={f} onClick={()=>setFilterStatus(f)} style={{padding:"7px 11px",fontSize:11,border:"none",background:filterStatus===f?"var(--surface3)":"transparent",color:filterStatus===f?"var(--text)":"var(--text3)",fontFamily:"var(--mono)",fontWeight:filterStatus===f?600:400,transition:"all 0.15s"}}>
-                    {f.charAt(0).toUpperCase()+f.slice(1)}<span style={{opacity:0.5,marginLeft:4}}>({counts[f]??vis.length})</span>
+                    {{all:"All",pending:"Missing Receipt",ready:"Receipt Attached",exported:"Exported"}[f]||f}<span style={{opacity:0.5,marginLeft:4}}>({counts[f]??vis.length})</span>
                   </button>
                 ))}
               </div>
@@ -1619,16 +1711,10 @@ export default function App() {
                   return <option key={m} value={m}>{MONTHS[+mo-1]} {y}</option>;
                 })}
               </select>
-              {isAdmin&&(
-                <select value={filterUser} onChange={e=>setFilterUser(e.target.value)} style={{width:"auto",minWidth:160,fontSize:12}}>
-                  <option value="all">All users</option>
-                  {users.filter(u=>u.role==="user").map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
-                </select>
-              )}
-              {isAdmin&&(
+              {filterableCards.length > 0&&(
                 <select value={filterCard} onChange={e=>setFilterCard(e.target.value)} style={{width:"auto",minWidth:160,fontSize:12}}>
                   <option value="all">All cards</option>
-                  {cards.filter(c=>c.active).map(c=><option key={c.id} value={c.name}>{c.name} · {c.division}</option>)}
+                  {filterableCards.map(c=><option key={c.id} value={c.name}>{c.name}{isAdmin?` · ${c.division}`:""}</option>)}
                 </select>
               )}
               <input type="text" placeholder="Search vendor or description..." value={search} onChange={e=>setSearch(e.target.value)} style={{width:220}}/>
@@ -1640,8 +1726,8 @@ export default function App() {
 
             {/* Table */}
             <div className="card" style={{overflow:"hidden"}}>
-              <div style={{display:"grid",gridTemplateColumns:"82px 1fr 1fr 96px 96px 110px 80px 80px 28px",padding:"10px 16px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em"}}>
-                <span>Date</span><span>Vendor</span><span>Category · Dept</span><span>User</span><span>Assignee</span><span style={{textAlign:"right"}}>Amount</span><span style={{textAlign:"center"}}>Receipt</span><span style={{textAlign:"center"}}>Status</span><span/>
+              <div style={{display:"grid",gridTemplateColumns:"82px 1fr 1fr 120px 96px 110px 80px 80px 28px",padding:"10px 16px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em"}}>
+                <span>Date</span><span>Vendor</span><span>Category · Dept</span><span>Card</span><span>Assignee</span><span style={{textAlign:"right"}}>Amount</span><span style={{textAlign:"center"}}>Receipt</span><span style={{textAlign:"center"}}>Status</span><span/>
               </div>
               <div style={{overflowY:"auto",maxHeight:"calc(100vh - 420px)"}}>
                 {vis.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--text3)",fontSize:13}}>No transactions match your filters.</div>}
@@ -1651,7 +1737,7 @@ export default function App() {
                   const cat=CATEGORIES.find(c=>c.id===t.categoryId);
                   return(
                     <div key={t.id} className={"tx-row"+(selectedTxId===t.id?" selected":"")}
-                      style={{display:"grid",gridTemplateColumns:"82px 1fr 1fr 96px 96px 110px 80px 80px 28px",alignItems:"center",padding:"11px 16px",cursor:"pointer"}}
+                      style={{display:"grid",gridTemplateColumns:"82px 1fr 1fr 120px 96px 110px 80px 80px 28px",alignItems:"center",padding:"11px 16px",cursor:"pointer"}}
                       onClick={()=>setSelectedTxId(t.id)}>
                       <span style={{fontSize:12,color:"var(--text3)",fontFamily:"var(--mono)"}}>{fmtDate(t.date)}</span>
                       <div>
@@ -1672,7 +1758,7 @@ export default function App() {
                           {t.reconId&&<span style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--accent)",background:"var(--accent-dim)",borderRadius:4,padding:"1px 5px",border:"1px solid var(--accent-border)"}}>{t.reconId}</span>}
                         </div>
                       </div>
-                      <span style={{fontSize:12,color:"var(--text2)"}}>{owner?.name.split(" ")[0]||"—"}</span>
+                      <span style={{fontSize:11,color:"var(--text2)",fontFamily:"var(--mono)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.card||"—"}</span>
                       <div style={{display:"flex",alignItems:"center",gap:5}}>
                         {assignee?<><Av name={assignee.name} color={ROLE_COLOR[assignee.role]} size={20}/><span style={{fontSize:11,color:"var(--text2)"}}>{assignee.name.split(" ")[0]}</span>{t.autoAssignee&&<span style={{fontSize:9,color:"var(--purple)"}}>⚡</span>}</>:<span style={{fontSize:11,color:"var(--text3)"}}>—</span>}
                       </div>
@@ -1720,7 +1806,7 @@ export default function App() {
                     <span style={{fontSize:13}}>📥</span>
                     <span style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--amber)"}}>Unmapped Receipts ({unmappedReceipts.length})</span>
                   </div>
-                  <span style={{fontSize:11,color:"var(--amber)"}}>Assign each receipt to a transaction below</span>
+                  <button className="btn-primary" style={{fontSize:11,padding:"5px 12px"}} onClick={handleRematch} disabled={unmappedReceipts.every(r=>!r.file)}>⚡ Re-match with AI</button>
                 </div>
                 {unmappedReceipts.map(r=>(
                   <div key={r.name} style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:12,alignItems:"center",padding:"12px 16px",borderBottom:"1px solid var(--border)"}}>
@@ -1731,10 +1817,12 @@ export default function App() {
                         <div style={{fontSize:11,color:"var(--text3)"}}>{(r.size/1024).toFixed(0)} KB</div>
                       </div>
                     </div>
-                    <select defaultValue="" onChange={e=>{
+                    <select defaultValue="" onChange={async e=>{
                       const txId=+e.target.value;
                       if(!txId)return;
-                      update(txId,{receipt:{name:r.name,size:r.size,url:r.url},receiptMatch:null});
+                      let url=r.url;
+                      if(r.file){try{url=await api.uploadReceiptFile(r.file,txId);}catch(e){}}
+                      update(txId,{receipt:{name:r.name,size:r.size,url},receiptMatch:null});
                       setUnmappedReceipts(prev=>prev.filter(x=>x.name!==r.name));
                     }} style={{fontSize:12}}>
                       <option value="">— Assign to transaction —</option>
@@ -1759,7 +1847,10 @@ export default function App() {
                   {t.receipt?(
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
                       {t.receiptMatch&&<span className="tag tag-ai">⚡ AI</span>}
-                      <span className="tag tag-green">📎 {t.receipt.name.length>20?t.receipt.name.slice(0,17)+"…":t.receipt.name}</span>
+                      {t.receipt.url&&!t.receipt.url.startsWith("blob:")?
+                        <a href={t.receipt.url} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><span className="tag tag-green" style={{cursor:"pointer"}}>📎 {t.receipt.name.length>20?t.receipt.name.slice(0,17)+"…":t.receipt.name}</span></a>:
+                        <span className="tag tag-green">📎 {t.receipt.name.length>20?t.receipt.name.slice(0,17)+"…":t.receipt.name}</span>
+                      }
                     </div>
                   ):<span className="tag tag-red">⚠ Missing</span>}
                 </div>
@@ -1769,7 +1860,7 @@ export default function App() {
         )}
 
         {/* USERS */}
-        {activeTab==="users"&&isAdmin&&<UserMgmt users={users} onUpdate={setUsers}/>}
+        {activeTab==="users"&&isAdmin&&<UserMgmt users={users} onUpdate={setUsers} cards={cards}/>}
 
         {/* SETTINGS */}
         {activeTab==="settings"&&isAdmin&&(
