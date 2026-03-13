@@ -586,16 +586,21 @@ function UserMgmt({ users, cards, onUpdate }) {
               </div>
               <div className="input-group">
                 <label className="input-label">Assigned Cards</label>
-                <div style={{display:"flex",flexDirection:"column",gap:6,padding:"8px 10px",border:"1px solid var(--border2)",borderRadius:6,background:"var(--surface)"}}>
-                  {activeCards.length===0&&<span style={{fontSize:12,color:"var(--text3)"}}>No active cards available.</span>}
-                  {activeCards.map(c=>(
-                    <label key={c.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:12,cursor:"pointer"}}>
-                      <input type="checkbox" checked={form.cards.includes(c.name)} onChange={e=>setForm(p=>({...p,cards:e.target.checked?[...p.cards,c.name]:p.cards.filter(x=>x!==c.name)}))}/>
-                      <span style={{fontFamily:"var(--mono)"}}>{c.name}</span>
-                      {c.division&&<span style={{color:"var(--text3)"}}>· {c.division}</span>}
-                    </label>
-                  ))}
-                </div>
+                {activeCards.length===0
+                  ?<div style={{fontSize:12,color:"var(--text3)",padding:"8px 0"}}>No active cards available.</div>
+                  :<div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:4}}>
+                    {activeCards.map(c=>{const sel=form.cards.includes(c.name);return(
+                      <div key={c.id} onClick={()=>setForm(p=>({...p,cards:sel?p.cards.filter(x=>x!==c.name):[...p.cards,c.name]}))} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,border:`1.5px solid ${sel?"var(--accent)":"var(--border2)"}`,background:sel?"var(--accent-dim)":"var(--surface)",cursor:"pointer",transition:"all 0.12s",userSelect:"none",minWidth:0}}>
+                        <span style={{fontSize:16}}>{c.network==="Visa"?"💳":c.network==="Amex"?"🟦":c.network==="Mastercard"?"🔴":"💳"}</span>
+                        <div>
+                          <div style={{fontSize:12,fontWeight:600,color:sel?"var(--accent)":"var(--text)",fontFamily:"var(--mono)"}}>{c.name}</div>
+                          {c.division&&<div style={{fontSize:10,color:"var(--text3)",marginTop:1}}>{c.division}</div>}
+                        </div>
+                        {sel&&<span style={{fontSize:12,color:"var(--accent)",marginLeft:2}}>✓</span>}
+                      </div>
+                    );})}
+                  </div>
+                }
               </div>
             </div>
             {addErr&&<div className="alert-error" style={{marginBottom:14}}>⚠ {addErr}</div>}
@@ -631,16 +636,21 @@ function UserMgmt({ users, cards, onUpdate }) {
               </div>
               <div className="input-group">
                 <label className="input-label">Assigned Cards</label>
-                <div style={{display:"flex",flexDirection:"column",gap:6,padding:"8px 10px",border:"1px solid var(--border2)",borderRadius:6,background:"var(--surface)"}}>
-                  {activeCards.length===0&&<span style={{fontSize:12,color:"var(--text3)"}}>No active cards available.</span>}
-                  {activeCards.map(c=>(
-                    <label key={c.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:12,cursor:"pointer"}}>
-                      <input type="checkbox" checked={(editForm.cards||[]).includes(c.name)} onChange={e=>setEditForm(p=>({...p,cards:e.target.checked?[...(p.cards||[]),c.name]:(p.cards||[]).filter(x=>x!==c.name)}))}/>
-                      <span style={{fontFamily:"var(--mono)"}}>{c.name}</span>
-                      {c.division&&<span style={{color:"var(--text3)"}}>· {c.division}</span>}
-                    </label>
-                  ))}
-                </div>
+                {activeCards.length===0
+                  ?<div style={{fontSize:12,color:"var(--text3)",padding:"8px 0"}}>No active cards available.</div>
+                  :<div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:4}}>
+                    {activeCards.map(c=>{const sel=(editForm.cards||[]).includes(c.name);return(
+                      <div key={c.id} onClick={()=>setEditForm(p=>({...p,cards:sel?(p.cards||[]).filter(x=>x!==c.name):[...(p.cards||[]),c.name]}))} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,border:`1.5px solid ${sel?"var(--accent)":"var(--border2)"}`,background:sel?"var(--accent-dim)":"var(--surface)",cursor:"pointer",transition:"all 0.12s",userSelect:"none",minWidth:0}}>
+                        <span style={{fontSize:16}}>{c.network==="Visa"?"💳":c.network==="Amex"?"🟦":c.network==="Mastercard"?"🔴":"💳"}</span>
+                        <div>
+                          <div style={{fontSize:12,fontWeight:600,color:sel?"var(--accent)":"var(--text)",fontFamily:"var(--mono)"}}>{c.name}</div>
+                          {c.division&&<div style={{fontSize:10,color:"var(--text3)",marginTop:1}}>{c.division}</div>}
+                        </div>
+                        {sel&&<span style={{fontSize:12,color:"var(--accent)",marginLeft:2}}>✓</span>}
+                      </div>
+                    );})}
+                  </div>
+                }
               </div>
             </div>
             {editErr&&<div className="alert-error" style={{marginBottom:14}}>⚠ {editErr}</div>}
@@ -1544,6 +1554,7 @@ export default function App() {
     if(u){
       const parseCards=raw=>{if(!raw)return[];try{const p=JSON.parse(raw);return Array.isArray(p)?p:[raw];}catch{return[raw];}};
       const session={...u,role:u.role,name:u.name,id:u.id,cards:parseCards(u.card)};
+      setActiveTab("transactions");
       setCurrentUser(session);
       try{localStorage.setItem("recon_session",JSON.stringify(session));}catch(e){}
     }
@@ -1593,7 +1604,10 @@ export default function App() {
                 <Av name={currentUser.name} color={ROLE_COLOR[currentUser.role]} size={22}/>
                 <div>
                   <div style={{fontSize:12,fontWeight:600,color:"#fff",lineHeight:1.2}}>{currentUser.name}</div>
-                  <div style={{fontSize:10,color:"rgba(255,255,255,0.6)",lineHeight:1.2}}>{ROLE_LABEL[currentUser.role]}</div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,0.6)",lineHeight:1.2}}>
+                    {ROLE_LABEL[currentUser.role]}
+                    {isUser&&(currentUser.cards||[]).length>0&&<span style={{marginLeft:6,color:"rgba(255,255,255,0.45)"}}>{(currentUser.cards||[]).join(" · ")}</span>}
+                  </div>
                 </div>
                 <span style={{fontSize:10,color:"rgba(255,255,255,0.5)",marginLeft:2}}>▾</span>
               </div>
