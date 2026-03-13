@@ -1507,10 +1507,18 @@ export default function App() {
       if(r)mapped.add(r.name);
       return r?{...t,receipt:{name:r.name,size:r.size,url:r.url},receiptMatch:match[1].confidence}:t;
     }));
-    // persist receipts that were left unmapped
-    const leftover=uploadedReceipts.filter(r=>!mapped.has(r.name));
+    // persist receipts that were left unmapped (keep raw File for re-matching)
+    const leftover=uploadedReceipts.filter(r=>!mapped.has(r.name)).map(r=>({...r,file:rawFiles.find(f=>f.name===r.name)||null}));
     setUnmappedReceipts(prev=>{const names=new Set(prev.map(x=>x.name));return [...prev,...leftover.filter(x=>!names.has(x.name))];});
     setShowMatcher(false);
+  };
+
+  const handleRematch=()=>{
+    const files=unmappedReceipts.map(r=>r.file).filter(Boolean);
+    if(!files.length)return;
+    setRawFiles(files);
+    setUploadedReceipts(unmappedReceipts.map(({name,size,url})=>({name,size,url})));
+    setShowMatcher(true);
   };
 
   const handleExportDone=async (record)=>{
@@ -1779,7 +1787,7 @@ export default function App() {
                     <span style={{fontSize:13}}>📥</span>
                     <span style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--amber)"}}>Unmapped Receipts ({unmappedReceipts.length})</span>
                   </div>
-                  <span style={{fontSize:11,color:"var(--amber)"}}>Assign each receipt to a transaction below</span>
+                  <button className="btn-primary" style={{fontSize:11,padding:"5px 12px"}} onClick={handleRematch} disabled={unmappedReceipts.every(r=>!r.file)}>⚡ Re-match with AI</button>
                 </div>
                 {unmappedReceipts.map(r=>(
                   <div key={r.name} style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:12,alignItems:"center",padding:"12px 16px",borderBottom:"1px solid var(--border)"}}>
