@@ -440,9 +440,10 @@ function AccountSettingsModal({ currentUser, onClose, onPasswordChanged }) {
 const SPECIAL_RE = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/;
 const sanitizeInput = s => String(s).replace(/[<>"'`;]/g,"").trim();
 
-function UserMgmt({ users, onUpdate }) {
+function UserMgmt({ users, cards, onUpdate }) {
   const [showAdd,setShowAdd]=useState(false);
-  const [form,setForm]=useState({name:"",email:"",password:"",role:"user",card:""});
+  const [form,setForm]=useState({name:"",email:"",password:"",role:"user",cards:[]});
+  const activeCards=cards.filter(c=>c.active);
   const [addErr,setAddErr]=useState("");
   const [editId,setEditId]=useState(null);
   const [editForm,setEditForm]=useState({});
@@ -472,10 +473,10 @@ function UserMgmt({ users, onUpdate }) {
         email: sanitizeInput(form.email).toLowerCase(),
         password: sanitizeInput(form.password),
         role: form.role,
-        card: sanitizeInput(form.card),
+        card: JSON.stringify(form.cards),
       });
-      onUpdate([...users,{...newUser,createdAt:newUser.created_at}]);
-      setForm({name:"",email:"",password:"",role:"user",card:""});
+      onUpdate([...users,{...newUser,cards:form.cards,createdAt:newUser.created_at}]);
+      setForm({name:"",email:"",password:"",role:"user",cards:[]});
       setShowAdd(false);setAddErr("");
     }catch(e){setAddErr("Failed to create user.");}
     setSaving(false);
@@ -489,9 +490,9 @@ function UserMgmt({ users, onUpdate }) {
         name: sanitizeInput(editForm.name),
         email: sanitizeInput(editForm.email).toLowerCase(),
         role: editForm.role,
-        card: sanitizeInput(editForm.card||""),
+        card: JSON.stringify(editForm.cards||[]),
       });
-      onUpdate(users.map(u=>u.id===editId?{...u,...editForm,email:sanitizeInput(editForm.email).toLowerCase()}:u));
+      onUpdate(users.map(u=>u.id===editId?{...u,...editForm,cards:editForm.cards||[],email:sanitizeInput(editForm.email).toLowerCase()}:u));
       setEditId(null);setEditErr("");
     }catch(e){setEditErr("Failed to save.");}
     setSaving(false);
@@ -512,8 +513,8 @@ function UserMgmt({ users, onUpdate }) {
   const deleteUser = async () => {
     setSaving(true);
     try{
-      await api.updateUser(deleteId,{active:false});
-      onUpdate(users.map(u=>u.id===deleteId?{...u,active:false}:u));
+      await api.deleteUser(deleteId);
+      onUpdate(users.filter(u=>u.id!==deleteId));
       setDeleteId(null);
     }catch(e){}
     setSaving(false);
@@ -539,8 +540,8 @@ function UserMgmt({ users, onUpdate }) {
               <Av name={u.name} color={ROLE_COLOR[u.role]} size={32}/>
               <div>
                 <div style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{u.name}</div>
-                <div style={{display:"flex",gap:6,alignItems:"center",marginTop:2}}>
-                  {u.card&&<span style={{fontSize:11,color:"var(--text3)",fontFamily:"var(--mono)"}}>{u.card}</span>}
+                <div style={{display:"flex",gap:6,alignItems:"center",marginTop:2,flexWrap:"wrap"}}>
+                  {(u.cards||[]).map(c=><span key={c} style={{fontSize:10,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--surface2)",padding:"1px 5px",borderRadius:3}}>{c}</span>)}
                   {!u.active&&<span className="tag tag-red" style={{fontSize:9}}>Inactive</span>}
                 </div>
               </div>
@@ -550,11 +551,12 @@ function UserMgmt({ users, onUpdate }) {
               <RoleTag role={u.role}/>
             </div>
             <div style={{alignSelf:"center",display:"flex",gap:6,justifyContent:"flex-end"}}>
-              <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px"}} title="Edit user" onClick={()=>{setEditId(u.id);setEditForm({name:u.name,email:u.email,role:u.role,card:u.card||""});}}>✎</button>
+              <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px"}} title="Edit user" onClick={()=>{setEditId(u.id);setEditForm({name:u.name,email:u.email,role:u.role,cards:Array.isArray(u.cards)?u.cards:[]});}}>✎</button>
               <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px"}} title="Reset password" onClick={()=>{setResetId(u.id);setResetPw("");setResetErr("");setResetOk(false);}}>🔑</button>
               <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px",color:u.active?"var(--red)":"var(--green)"}} title={u.active?"Deactivate":"Activate"} onClick={async()=>{await api.updateUser(u.id,{active:!u.active});onUpdate(users.map(x=>x.id===u.id?{...x,active:!x.active}:x));}}>
                 {u.active?"⊘":"✓"}
               </button>
+              <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px",color:"var(--red)"}} title="Delete user" onClick={()=>setDeleteId(u.id)}>🗑</button>
             </div>
           </div>
         ))}
@@ -569,7 +571,7 @@ function UserMgmt({ users, onUpdate }) {
               <button className="btn-ghost" onClick={()=>{setShowAdd(false);setAddErr("");}}>✕</button>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:18}}>
-              {[{l:"Full Name",k:"name",t:"text",p:"Jane Smith"},{l:"Email",k:"email",t:"email",p:"jane@company.com"},{l:"Password",k:"password",t:"password",p:"Min 6 chars + special character"},{l:"Card (optional)",k:"card",t:"text",p:"Visa ••1234"}].map(f=>(
+              {[{l:"Full Name",k:"name",t:"text",p:"Jane Smith"},{l:"Email",k:"email",t:"email",p:"jane@company.com"},{l:"Password",k:"password",t:"password",p:"Min 6 chars + special character"}].map(f=>(
                 <div key={f.k} className="input-group">
                   <label className="input-label">{f.l}</label>
                   <input type={f.t} value={form[f.k]} placeholder={f.p} onChange={e=>setForm(p=>({...p,[f.k]:e.target.value}))}/>
@@ -581,6 +583,24 @@ function UserMgmt({ users, onUpdate }) {
                   <option value="user">User</option>
                   <option value="admin">Admin</option>
                 </select>
+              </div>
+              <div className="input-group">
+                <label className="input-label">Assigned Cards</label>
+                {activeCards.length===0
+                  ?<div style={{fontSize:12,color:"var(--text3)",padding:"8px 0"}}>No active cards available.</div>
+                  :<div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:4}}>
+                    {activeCards.map(c=>{const sel=form.cards.includes(c.name);return(
+                      <div key={c.id} onClick={()=>setForm(p=>({...p,cards:sel?p.cards.filter(x=>x!==c.name):[...p.cards,c.name]}))} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,border:`1.5px solid ${sel?"var(--accent)":"var(--border2)"}`,background:sel?"var(--accent-dim)":"var(--surface)",cursor:"pointer",transition:"all 0.12s",userSelect:"none",minWidth:0}}>
+                        <span style={{fontSize:16}}>{c.network==="Visa"?"💳":c.network==="Amex"?"🟦":c.network==="Mastercard"?"🔴":"💳"}</span>
+                        <div>
+                          <div style={{fontSize:12,fontWeight:600,color:sel?"var(--accent)":"var(--text)",fontFamily:"var(--mono)"}}>{c.name}</div>
+                          {c.division&&<div style={{fontSize:10,color:"var(--text3)",marginTop:1}}>{c.division}</div>}
+                        </div>
+                        {sel&&<span style={{fontSize:12,color:"var(--accent)",marginLeft:2}}>✓</span>}
+                      </div>
+                    );})}
+                  </div>
+                }
               </div>
             </div>
             {addErr&&<div className="alert-error" style={{marginBottom:14}}>⚠ {addErr}</div>}
@@ -601,7 +621,7 @@ function UserMgmt({ users, onUpdate }) {
               <button className="btn-ghost" onClick={()=>{setEditId(null);setEditErr("");}}>✕</button>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:18}}>
-              {[{l:"Full Name",k:"name",t:"text"},{l:"Email",k:"email",t:"email"},{l:"Card (optional)",k:"card",t:"text",p:"Visa ••1234"}].map(f=>(
+              {[{l:"Full Name",k:"name",t:"text"},{l:"Email",k:"email",t:"email"}].map(f=>(
                 <div key={f.k} className="input-group">
                   <label className="input-label">{f.l}</label>
                   <input type={f.t} value={editForm[f.k]||""} placeholder={f.p||""} onChange={e=>setEditForm(p=>({...p,[f.k]:e.target.value}))}/>
@@ -613,6 +633,24 @@ function UserMgmt({ users, onUpdate }) {
                   <option value="user">User</option>
                   <option value="admin">Admin</option>
                 </select>
+              </div>
+              <div className="input-group">
+                <label className="input-label">Assigned Cards</label>
+                {activeCards.length===0
+                  ?<div style={{fontSize:12,color:"var(--text3)",padding:"8px 0"}}>No active cards available.</div>
+                  :<div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:4}}>
+                    {activeCards.map(c=>{const sel=(editForm.cards||[]).includes(c.name);return(
+                      <div key={c.id} onClick={()=>setEditForm(p=>({...p,cards:sel?(p.cards||[]).filter(x=>x!==c.name):[...(p.cards||[]),c.name]}))} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,border:`1.5px solid ${sel?"var(--accent)":"var(--border2)"}`,background:sel?"var(--accent-dim)":"var(--surface)",cursor:"pointer",transition:"all 0.12s",userSelect:"none",minWidth:0}}>
+                        <span style={{fontSize:16}}>{c.network==="Visa"?"💳":c.network==="Amex"?"🟦":c.network==="Mastercard"?"🔴":"💳"}</span>
+                        <div>
+                          <div style={{fontSize:12,fontWeight:600,color:sel?"var(--accent)":"var(--text)",fontFamily:"var(--mono)"}}>{c.name}</div>
+                          {c.division&&<div style={{fontSize:10,color:"var(--text3)",marginTop:1}}>{c.division}</div>}
+                        </div>
+                        {sel&&<span style={{fontSize:12,color:"var(--accent)",marginLeft:2}}>✓</span>}
+                      </div>
+                    );})}
+                  </div>
+                }
               </div>
             </div>
             {editErr&&<div className="alert-error" style={{marginBottom:14}}>⚠ {editErr}</div>}
@@ -654,6 +692,22 @@ function UserMgmt({ users, onUpdate }) {
             <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
               <button className="btn-secondary" onClick={()=>{setResetId(null);setResetPw("");}}>Cancel</button>
               <button className="btn-primary" onClick={resetPassword} disabled={saving||!resetPw}>{saving?"Saving…":"Reset Password"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE USER MODAL */}
+      {deleteId&&(
+        <div className="modal-overlay">
+          <div className="modal-box card" style={{width:"100%",maxWidth:400,padding:28}}>
+            <div style={{fontSize:16,fontWeight:700,color:"var(--text)",marginBottom:10}}>Delete User</div>
+            <div style={{fontSize:13,color:"var(--text2)",marginBottom:20}}>
+              Are you sure you want to permanently delete <strong>{users.find(u=>u.id===deleteId)?.name}</strong>? This cannot be undone.
+            </div>
+            <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+              <button className="btn-secondary" onClick={()=>setDeleteId(null)}>Cancel</button>
+              <button className="btn-primary" style={{background:"var(--red)",borderColor:"var(--red)"}} onClick={deleteUser} disabled={saving}>{saving?"Deleting…":"Delete User"}</button>
             </div>
           </div>
         </div>
@@ -1184,7 +1238,8 @@ function ImportModal({ cards, currentUser, onImport, onClose }) {
   const [file,setFile]=useState(null);
   const [err,setErr]=useState("");
   const fileRef=useRef();
-  const activeCards=cards.filter(c=>c.active);
+  const userCards=currentUser.role==="admin"?null:(currentUser.cards||[]);
+  const activeCards=cards.filter(c=>c.active&&(!userCards||userCards.includes(c.name)));
   const monthOptions=[];
   const now=new Date();
   for(let i=0;i<12;i++){
@@ -1348,7 +1403,7 @@ function NSModal({ transactions, onClose, onDone }) {
 // ── MAIN ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const [users,setUsers]=useState([]);
-  const [currentUser,setCurrentUser]=useState(()=>{try{const s=localStorage.getItem("recon_session");return s?JSON.parse(s):null;}catch(e){return null;}});
+  const [currentUser,setCurrentUser]=useState(()=>{try{const s=localStorage.getItem("recon_session");if(!s)return null;const u=JSON.parse(s);if(!u.cards){const raw=u.card;try{const p=JSON.parse(raw);u.cards=Array.isArray(p)?p:(raw?[raw]:[]);}catch{u.cards=raw?[raw]:[];}}return u;}catch(e){return null;}});
   const [vendorAssignees,setVendorAssignees]=useState(DEFAULT_VENDOR_ASSIGNEES);
   const [transactions,setTransactions]=useState([]);
   const [loading,setLoading]=useState(false);
@@ -1472,7 +1527,7 @@ export default function App() {
   const availableMonths = [...new Set(transactions.map(t=>t.date.slice(0,7)))].sort();
 
   const vis=transactions.filter(t=>{
-    if(isUser&&t.userId!==currentUser.id)return false;
+    if(isUser){const uc=currentUser.cards||[];if(uc.length>0){if(!uc.includes(t.card))return false;}else{if(t.userId!==currentUser.id)return false;}}
     if(filterStatus!=="all"&&t.status!==filterStatus)return false;
     if(filterUser!=="all"&&t.userId!==filterUser)return false;
     if(filterCard!=="all"&&t.card!==filterCard)return false;
@@ -1497,7 +1552,9 @@ export default function App() {
   const handleLogin=async (email,pw)=>{
     const u=await api.loginUser(email,pw);
     if(u){
-      const session={...u,role:u.role,name:u.name,id:u.id,card:u.card};
+      const parseCards=raw=>{if(!raw)return[];try{const p=JSON.parse(raw);return Array.isArray(p)?p:[raw];}catch{return[raw];}};
+      const session={...u,role:u.role,name:u.name,id:u.id,cards:parseCards(u.card)};
+      setActiveTab("transactions");
       setCurrentUser(session);
       try{localStorage.setItem("recon_session",JSON.stringify(session));}catch(e){}
     }
@@ -1547,7 +1604,10 @@ export default function App() {
                 <Av name={currentUser.name} color={ROLE_COLOR[currentUser.role]} size={22}/>
                 <div>
                   <div style={{fontSize:12,fontWeight:600,color:"#fff",lineHeight:1.2}}>{currentUser.name}</div>
-                  <div style={{fontSize:10,color:"rgba(255,255,255,0.6)",lineHeight:1.2}}>{ROLE_LABEL[currentUser.role]}</div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,0.6)",lineHeight:1.2}}>
+                    {ROLE_LABEL[currentUser.role]}
+                    {isUser&&(currentUser.cards||[]).length>0&&<span style={{marginLeft:6,color:"rgba(255,255,255,0.45)"}}>{(currentUser.cards||[]).join(" · ")}</span>}
+                  </div>
                 </div>
                 <span style={{fontSize:10,color:"rgba(255,255,255,0.5)",marginLeft:2}}>▾</span>
               </div>
@@ -1769,7 +1829,7 @@ export default function App() {
         )}
 
         {/* USERS */}
-        {activeTab==="users"&&isAdmin&&<UserMgmt users={users} onUpdate={setUsers}/>}
+        {activeTab==="users"&&isAdmin&&<UserMgmt users={users} cards={cards} onUpdate={setUsers}/>}
 
         {/* SETTINGS */}
         {activeTab==="settings"&&isAdmin&&(
