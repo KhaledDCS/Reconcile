@@ -965,8 +965,14 @@ function TxDrawer({ tx, currentUser, allUsers, onUpdate, onClose, locked }) {
   const isAdmin=currentUser.role==="admin";
   const canEdit=!locked||(isAdmin&&tx.status==="submitted");
 
-  const save=()=>{onUpdate(local.id,local);onClose();};
-  const handleFile=(file)=>{if(!file)return;setLocal(t=>({...t,receipt:{name:file.name,size:file.size,url:URL.createObjectURL(file)}}));};
+  const save=async()=>{
+    let finalLocal=local;
+    if(local.receipt?._file){
+      try{const url=await api.uploadReceiptFile(local.receipt._file,local.id);finalLocal={...local,receipt:{name:local.receipt.name,size:local.receipt.size,url}};}catch(e){}
+    }
+    onUpdate(finalLocal.id,finalLocal);onClose();
+  };
+  const handleFile=(file)=>{if(!file)return;setLocal(t=>({...t,receipt:{name:file.name,size:file.size,url:URL.createObjectURL(file),_file:file}}));};
 
   return(
     <div style={{position:"fixed",inset:0,zIndex:90,display:"flex"}}>
@@ -1023,6 +1029,7 @@ function TxDrawer({ tx, currentUser, allUsers, onUpdate, onClose, locked }) {
                   <div style={{fontSize:11,color:"var(--text3)"}}>{(local.receipt.size/1024).toFixed(0)} KB</div>
                 </div>
                 {local.receiptMatch&&<span className="tag tag-ai">⚡ AI</span>}
+                {local.receipt.url&&!local.receipt.url.startsWith("blob:")&&<a href={local.receipt.url} target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{fontSize:11,textDecoration:"none"}}>View</a>}
                 {canEdit&&<button className="btn-ghost" style={{color:"var(--red)",fontSize:11}} onClick={()=>setLocal(t=>({...t,receipt:null}))}>Remove</button>}
               </div>
             ):canEdit?(
@@ -1498,14 +1505,30 @@ export default function App() {
     setShowMatcher(true);
   };
 
-  const handleMatchConfirm=(matches)=>{
+  const handleMatchConfirm=async(matches)=>{
     const mapped=new Set();
+    const resolved={}; // name -> permanent url
+    for(const [name,matchData] of Object.entries(matches)){
+      if(!matchData.txId)continue;
+      const r=uploadedReceipts.find(x=>x.name===name);
+      if(!r)continue;
+      const rawFile=rawFiles.find(f=>f.name===name);
+      let url=r.url;
+      if(rawFile){try{url=await api.uploadReceiptFile(rawFile,matchData.txId);}catch(e){}}
+      resolved[name]=url;
+      mapped.add(name);
+    }
+    // Persist matched receipts to DB
+    await Promise.all(Object.entries(matches).filter(([,v])=>v.txId).map(async([name,matchData])=>{
+      const r=uploadedReceipts.find(x=>x.name===name);
+      if(r)await api.attachReceipt(matchData.txId,{name:r.name,size:r.size,url:resolved[name]||r.url,receiptMatch:matchData.confidence}).catch(()=>{});
+    }));
     setTransactions(prev=>prev.map(t=>{
       const match=Object.entries(matches).find(([,v])=>v.txId===t.id);
       if(!match)return t;
       const r=uploadedReceipts.find(r=>r.name===match[0]);
-      if(r)mapped.add(r.name);
-      return r?{...t,receipt:{name:r.name,size:r.size,url:r.url},receiptMatch:match[1].confidence}:t;
+      if(!r)return t;
+      return {...t,receipt:{name:r.name,size:r.size,url:resolved[r.name]||r.url},receiptMatch:match[1].confidence};
     }));
     // persist receipts that were left unmapped (keep raw File for re-matching)
     const leftover=uploadedReceipts.filter(r=>!mapped.has(r.name)).map(r=>({...r,file:rawFiles.find(f=>f.name===r.name)||null}));
@@ -1798,10 +1821,12 @@ export default function App() {
                         <div style={{fontSize:11,color:"var(--text3)"}}>{(r.size/1024).toFixed(0)} KB</div>
                       </div>
                     </div>
-                    <select defaultValue="" onChange={e=>{
+                    <select defaultValue="" onChange={async e=>{
                       const txId=+e.target.value;
                       if(!txId)return;
-                      update(txId,{receipt:{name:r.name,size:r.size,url:r.url},receiptMatch:null});
+                      let url=r.url;
+                      if(r.file){try{url=await api.uploadReceiptFile(r.file,txId);}catch(e){}}
+                      update(txId,{receipt:{name:r.name,size:r.size,url},receiptMatch:null});
                       setUnmappedReceipts(prev=>prev.filter(x=>x.name!==r.name));
                     }} style={{fontSize:12}}>
                       <option value="">— Assign to transaction —</option>
@@ -1826,7 +1851,10 @@ export default function App() {
                   {t.receipt?(
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
                       {t.receiptMatch&&<span className="tag tag-ai">⚡ AI</span>}
-                      <span className="tag tag-green">📎 {t.receipt.name.length>20?t.receipt.name.slice(0,17)+"…":t.receipt.name}</span>
+                      {t.receipt.url&&!t.receipt.url.startsWith("blob:")?
+                        <a href={t.receipt.url} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><span className="tag tag-green" style={{cursor:"pointer"}}>📎 {t.receipt.name.length>20?t.receipt.name.slice(0,17)+"…":t.receipt.name}</span></a>:
+                        <span className="tag tag-green">📎 {t.receipt.name.length>20?t.receipt.name.slice(0,17)+"…":t.receipt.name}</span>
+                      }
                     </div>
                   ):<span className="tag tag-red">⚠ Missing</span>}
                 </div>
