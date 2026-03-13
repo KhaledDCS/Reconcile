@@ -512,8 +512,8 @@ function UserMgmt({ users, onUpdate }) {
   const deleteUser = async () => {
     setSaving(true);
     try{
-      await api.updateUser(deleteId,{active:false});
-      onUpdate(users.map(u=>u.id===deleteId?{...u,active:false}:u));
+      await api.deleteUser(deleteId);
+      onUpdate(users.filter(u=>u.id!==deleteId));
       setDeleteId(null);
     }catch(e){}
     setSaving(false);
@@ -555,6 +555,7 @@ function UserMgmt({ users, onUpdate }) {
               <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px",color:u.active?"var(--red)":"var(--green)"}} title={u.active?"Deactivate":"Activate"} onClick={async()=>{await api.updateUser(u.id,{active:!u.active});onUpdate(users.map(x=>x.id===u.id?{...x,active:!x.active}:x));}}>
                 {u.active?"⊘":"✓"}
               </button>
+              <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px",color:"var(--red)"}} title="Delete user" onClick={()=>setDeleteId(u.id)}>🗑</button>
             </div>
           </div>
         ))}
@@ -654,6 +655,22 @@ function UserMgmt({ users, onUpdate }) {
             <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
               <button className="btn-secondary" onClick={()=>{setResetId(null);setResetPw("");}}>Cancel</button>
               <button className="btn-primary" onClick={resetPassword} disabled={saving||!resetPw}>{saving?"Saving…":"Reset Password"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE USER MODAL */}
+      {deleteId&&(
+        <div className="modal-overlay">
+          <div className="modal-box card" style={{width:"100%",maxWidth:400,padding:28}}>
+            <div style={{fontSize:16,fontWeight:700,color:"var(--text)",marginBottom:10}}>Delete User</div>
+            <div style={{fontSize:13,color:"var(--text2)",marginBottom:20}}>
+              Are you sure you want to permanently delete <strong>{users.find(u=>u.id===deleteId)?.name}</strong>? This cannot be undone.
+            </div>
+            <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+              <button className="btn-secondary" onClick={()=>setDeleteId(null)}>Cancel</button>
+              <button className="btn-primary" style={{background:"var(--red)",borderColor:"var(--red)"}} onClick={deleteUser} disabled={saving}>{saving?"Deleting…":"Delete User"}</button>
             </div>
           </div>
         </div>

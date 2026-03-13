@@ -19,6 +19,10 @@ export async function updateUser(id, changes) {
   const { error } = await supabase.from('users').update(changes).eq('id', id);
   if (error) throw error;
 }
+export async function deleteUser(id) {
+  const { error } = await supabase.from('users').delete().eq('id', id);
+  if (error) throw error;
+}
 export async function attachReceipt(transactionId, receipt) {
   await supabase.from('receipts').delete().eq('transaction_id', transactionId);
   const { error } = await supabase.from('receipts').insert({ transaction_id: transactionId, name: receipt.name, size: receipt.size, url: receipt.url, receipt_match: receipt.receiptMatch || null });
