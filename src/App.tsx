@@ -442,7 +442,7 @@ const sanitizeInput = s => String(s).replace(/[<>"'`;]/g,"").trim();
 
 function UserMgmt({ users, onUpdate, cards }) {
   const [showAdd,setShowAdd]=useState(false);
-  const [form,setForm]=useState({name:"",email:"",password:"",role:"user",card:""});
+  const [form,setForm]=useState({name:"",email:"",password:"",role:"user",card:[]});
   const [addErr,setAddErr]=useState("");
   const [editId,setEditId]=useState(null);
   const [editForm,setEditForm]=useState({});
@@ -472,10 +472,10 @@ function UserMgmt({ users, onUpdate, cards }) {
         email: sanitizeInput(form.email).toLowerCase(),
         password: sanitizeInput(form.password),
         role: form.role,
-        card: form.card||null,
+        card: form.card.length ? JSON.stringify(form.card) : null,
       });
-      onUpdate([...users,{...newUser,createdAt:newUser.created_at}]);
-      setForm({name:"",email:"",password:"",role:"user",card:""});
+      onUpdate([...users,{...newUser,createdAt:newUser.created_at,card:form.card}]);
+      setForm({name:"",email:"",password:"",role:"user",card:[]});
       setShowAdd(false);setAddErr("");
     }catch(e){setAddErr("Failed to create user.");}
     setSaving(false);
@@ -489,7 +489,7 @@ function UserMgmt({ users, onUpdate, cards }) {
         name: sanitizeInput(editForm.name),
         email: sanitizeInput(editForm.email).toLowerCase(),
         role: editForm.role,
-        card: editForm.card||null,
+        card: editForm.card?.length ? JSON.stringify(editForm.card) : null,
       });
       onUpdate(users.map(u=>u.id===editId?{...u,...editForm,email:sanitizeInput(editForm.email).toLowerCase()}:u));
       setEditId(null);setEditErr("");
@@ -539,8 +539,8 @@ function UserMgmt({ users, onUpdate, cards }) {
               <Av name={u.name} color={ROLE_COLOR[u.role]} size={32}/>
               <div>
                 <div style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{u.name}</div>
-                <div style={{display:"flex",gap:6,alignItems:"center",marginTop:2}}>
-                  {u.card&&<span style={{fontSize:11,color:"var(--text3)",fontFamily:"var(--mono)"}}>{u.card}</span>}
+                <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap",marginTop:2}}>
+                  {(Array.isArray(u.card)?u.card:[]).map((c,i)=><span key={i} style={{fontSize:10,color:"var(--text3)",fontFamily:"var(--mono)",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:3,padding:"1px 5px"}}>{c}</span>)}
                   {!u.active&&<span className="tag tag-red" style={{fontSize:9}}>Inactive</span>}
                 </div>
               </div>
@@ -550,7 +550,7 @@ function UserMgmt({ users, onUpdate, cards }) {
               <RoleTag role={u.role}/>
             </div>
             <div style={{alignSelf:"center",display:"flex",gap:6,justifyContent:"flex-end"}}>
-              <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px"}} title="Edit user" onClick={()=>{setEditId(u.id);setEditForm({name:u.name,email:u.email,role:u.role,card:u.card||""});}}>✎</button>
+              <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px"}} title="Edit user" onClick={()=>{setEditId(u.id);setEditForm({name:u.name,email:u.email,role:u.role,card:Array.isArray(u.card)?u.card:(u.card?[u.card]:[])});}}>✎</button>
               <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px"}} title="Reset password" onClick={()=>{setResetId(u.id);setResetPw("");setResetErr("");setResetOk(false);}}>🔑</button>
               <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px",color:u.active?"var(--red)":"var(--green)"}} title={u.active?"Deactivate":"Activate"} onClick={async()=>{await api.updateUser(u.id,{active:!u.active});onUpdate(users.map(x=>x.id===u.id?{...x,active:!x.active}:x));}}>
                 {u.active?"⊘":"✓"}
@@ -583,11 +583,16 @@ function UserMgmt({ users, onUpdate, cards }) {
                 </select>
               </div>
               <div className="input-group">
-                <label className="input-label">Assigned Card (optional)</label>
-                <select value={form.card} onChange={e=>setForm(p=>({...p,card:e.target.value}))}>
-                  <option value="">— No card assigned —</option>
-                  {(cards||[]).filter(c=>c.active).map(c=><option key={c.id} value={c.name}>{c.name} · {c.division}</option>)}
-                </select>
+                <label className="input-label">Assigned Cards (optional)</label>
+                <div style={{display:"flex",flexDirection:"column",gap:6,padding:"8px 10px",border:"1px solid var(--border)",borderRadius:6,background:"var(--surface)"}}>
+                  {(cards||[]).filter(c=>c.active).length===0&&<span style={{fontSize:12,color:"var(--text3)"}}>No active cards</span>}
+                  {(cards||[]).filter(c=>c.active).map(c=>(
+                    <label key={c.id} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13,color:"var(--text)"}}>
+                      <input type="checkbox" checked={form.card.includes(c.name)} onChange={e=>setForm(p=>({...p,card:e.target.checked?[...p.card,c.name]:p.card.filter(x=>x!==c.name)}))} style={{accentColor:"var(--primary)"}}/>
+                      <span>{c.name}</span><span style={{fontSize:11,color:"var(--text3)"}}>· {c.division}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             </div>
             {addErr&&<div className="alert-error" style={{marginBottom:14}}>⚠ {addErr}</div>}
@@ -622,11 +627,16 @@ function UserMgmt({ users, onUpdate, cards }) {
                 </select>
               </div>
               <div className="input-group">
-                <label className="input-label">Assigned Card (optional)</label>
-                <select value={editForm.card||""} onChange={e=>setEditForm(p=>({...p,card:e.target.value}))}>
-                  <option value="">— No card assigned —</option>
-                  {(cards||[]).filter(c=>c.active).map(c=><option key={c.id} value={c.name}>{c.name} · {c.division}</option>)}
-                </select>
+                <label className="input-label">Assigned Cards (optional)</label>
+                <div style={{display:"flex",flexDirection:"column",gap:6,padding:"8px 10px",border:"1px solid var(--border)",borderRadius:6,background:"var(--surface)"}}>
+                  {(cards||[]).filter(c=>c.active).length===0&&<span style={{fontSize:12,color:"var(--text3)"}}>No active cards</span>}
+                  {(cards||[]).filter(c=>c.active).map(c=>(
+                    <label key={c.id} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13,color:"var(--text)"}}>
+                      <input type="checkbox" checked={(editForm.card||[]).includes(c.name)} onChange={e=>setEditForm(p=>({...p,card:e.target.checked?[...(p.card||[]),c.name]:(p.card||[]).filter(x=>x!==c.name)}))} style={{accentColor:"var(--primary)"}}/>
+                      <span>{c.name}</span><span style={{fontSize:11,color:"var(--text3)"}}>· {c.division}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             </div>
             {editErr&&<div className="alert-error" style={{marginBottom:14}}>⚠ {editErr}</div>}
@@ -1505,12 +1515,12 @@ export default function App() {
   const availableMonths = [...new Set(transactions.map(t=>t.date.slice(0,7)))].sort();
 
   // derive filterable cards based on role
-  const userVisibleCardNames = isUser ? [...new Set(transactions.filter(t=>t.userId===currentUser?.id).map(t=>t.card).filter(Boolean))] : [];
-  const filterableCards = isAdmin ? cards.filter(c=>c.active) : cards.filter(c=>userVisibleCardNames.includes(c.name));
+  const userCardArr = isUser ? (Array.isArray(currentUser?.card) ? currentUser.card : (currentUser?.card ? [currentUser.card] : [])) : [];
+  const filterableCards = isAdmin ? cards.filter(c=>c.active) : cards.filter(c=>userCardArr.includes(c.name));
 
   const vis=transactions.filter(t=>{
     if(isUser&&t.userId!==currentUser.id)return false;
-    if(isUser&&currentUser.card&&t.card!==currentUser.card)return false;
+    if(isUser&&userCardArr.length&&!userCardArr.includes(t.card))return false;
     if(filterStatus!=="all"&&t.status!==filterStatus)return false;
     if(filterUser!=="all"&&t.userId!==filterUser)return false;
     if(filterCard!=="all"&&t.card!==filterCard)return false;

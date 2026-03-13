@@ -1,17 +1,19 @@
 import { supabase } from './supabase';
+function parseCard(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string' && raw.startsWith('[')) { try { const p = JSON.parse(raw); return Array.isArray(p) ? p : []; } catch {} }
+  return raw ? [raw] : [];
+}
 export async function getUsers() {
   const { data, error } = await supabase.from('users').select('*').order('created_at');
   if (error) throw error;
-  return data.map(u => {
-    let card = u.card;
-    if (typeof card === 'string' && card.startsWith('[')) { try { const p = JSON.parse(card); card = Array.isArray(p) ? p[0] || null : card; } catch {} }
-    return { id: u.id, name: u.name, email: u.email, password: u.password, role: u.role, active: u.active, card, createdAt: u.created_at };
-  });
+  return data.map(u => ({ id: u.id, name: u.name, email: u.email, password: u.password, role: u.role, active: u.active, card: parseCard(u.card), createdAt: u.created_at }));
 }
 export async function loginUser(email, password) {
   const { data, error } = await supabase.from('users').select('*').eq('email', email).eq('password', password).eq('active', true).single();
   if (error) return null;
-  return data;
+  return { ...data, card: parseCard(data.card) };
 }
 export async function createUser(user) {
   const id = 'u' + Date.now();
