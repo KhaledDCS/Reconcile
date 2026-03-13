@@ -72,7 +72,8 @@ export async function getTransactions() {
     amount: parseFloat(t.amount), card: t.card, userId: t.user_id,
     categoryId: t.category_id, categoryName: t.category_name, dept: t.dept,
     confidence: t.confidence, autoAssigned: t.auto_assigned, isRecurring: t.is_recurring,
-    assigneeId: t.assignee_id, autoAssignee: t.auto_assignee, status: t.status,
+    assigneeId: t.assignee_id, autoAssignee: t.auto_assignee,
+    status: t.status === 'exported' ? 'exported' : (t.receipts?.[0] ? 'ready' : 'pending'),
     memo: t.memo, flagReason: t.flag_reason, reconId: t.recon_id,
     receipt: t.receipts?.[0] ? { name: t.receipts[0].name, size: t.receipts[0].size, url: t.receipts[0].url } : null,
     receiptMatch: t.receipts?.[0]?.receipt_match || null
