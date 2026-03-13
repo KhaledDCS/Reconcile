@@ -31,14 +31,14 @@ export async function uploadReceiptFile(file, txId) {
   // Ensure bucket exists (ignore error if already exists)
   await supabase.storage.createBucket('receipts', { public: true }).catch(() => {});
   const { error } = await supabase.storage.from('receipts').upload(path, file, { upsert: true });
-  if (error) throw error;
+  if (error) { console.error('[uploadReceiptFile] Storage error:', error); throw error; }
   const { data } = supabase.storage.from('receipts').getPublicUrl(path);
   return data.publicUrl;
 }
 export async function attachReceipt(transactionId, receipt) {
   await supabase.from('receipts').delete().eq('transaction_id', transactionId);
   const { error } = await supabase.from('receipts').insert({ transaction_id: transactionId, name: receipt.name, size: receipt.size, url: receipt.url, receipt_match: receipt.receiptMatch || null });
-  if (error) throw error;
+  if (error) { console.error('[attachReceipt] DB error:', error); throw error; }
 }
 export async function removeReceipt(transactionId) {
   const { error } = await supabase.from('receipts').delete().eq('transaction_id', transactionId);

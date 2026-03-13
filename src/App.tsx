@@ -268,7 +268,7 @@ function RoleTag({ role }) {
 }
 
 function StatusTag({ status }) {
-  const m={pending:["tag-amber","● Pending"],submitted:["tag-blue","↑ Submitted"],approved:["tag-green","✓ Approved"],flagged:["tag-red","⚑ Flagged"],exported:["tag-gray","→ Exported"]};
+  const m={pending:["tag-amber","⚠ Missing Receipt"],ready:["tag-blue","📎 Receipt Attached"],exported:["tag-green","✓ Exported"]};
   const [cls,label]=m[status]||["tag-gray",status];
   return <span className={`tag ${cls}`}>{label}</span>;
 }
@@ -963,16 +963,18 @@ function TxDrawer({ tx, currentUser, allUsers, onUpdate, onClose, locked }) {
   const [local,setLocal]=useState({...tx});
   const fileRef=useRef();
   const isAdmin=currentUser.role==="admin";
-  const canEdit=!locked||(isAdmin&&tx.status==="submitted");
+  const canEdit=local.status!=="exported";
 
   const save=async()=>{
     let finalLocal=local;
     if(local.receipt?._file){
-      try{const url=await api.uploadReceiptFile(local.receipt._file,local.id);finalLocal={...local,receipt:{name:local.receipt.name,size:local.receipt.size,url}};}catch(e){}
+      try{const url=await api.uploadReceiptFile(local.receipt._file,local.id);finalLocal={...local,receipt:{name:local.receipt.name,size:local.receipt.size,url}};}
+      catch(e){console.error('[save] Upload failed:',e);}
     }
-    onUpdate(finalLocal.id,finalLocal);onClose();
+    try{await onUpdate(finalLocal.id,finalLocal);}catch(e){console.error('[save] DB save failed:',e);}
+    onClose();
   };
-  const handleFile=(file)=>{if(!file)return;setLocal(t=>({...t,receipt:{name:file.name,size:file.size,url:URL.createObjectURL(file),_file:file}}));};
+  const handleFile=(file)=>{if(!file)return;setLocal(t=>({...t,status:"ready",receipt:{name:file.name,size:file.size,url:URL.createObjectURL(file),_file:file}}));};
 
   return(
     <div style={{position:"fixed",inset:0,zIndex:90,display:"flex"}}>
@@ -1030,7 +1032,7 @@ function TxDrawer({ tx, currentUser, allUsers, onUpdate, onClose, locked }) {
                 </div>
                 {local.receiptMatch&&<span className="tag tag-ai">⚡ AI</span>}
                 {local.receipt.url&&!local.receipt.url.startsWith("blob:")&&<a href={local.receipt.url} target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{fontSize:11,textDecoration:"none"}}>View</a>}
-                {canEdit&&<button className="btn-ghost" style={{color:"var(--red)",fontSize:11}} onClick={()=>setLocal(t=>({...t,receipt:null}))}>Remove</button>}
+                {canEdit&&<button className="btn-ghost" style={{color:"var(--red)",fontSize:11}} onClick={()=>setLocal(t=>({...t,receipt:null,status:"pending"}))}>Remove</button>}
               </div>
             ):canEdit?(
               <div className="drop-zone" style={{padding:"24px",textAlign:"center"}} onClick={()=>fileRef.current.click()}
@@ -1045,23 +1047,19 @@ function TxDrawer({ tx, currentUser, allUsers, onUpdate, onClose, locked }) {
               <div style={{fontSize:12,color:"var(--red)",fontFamily:"var(--mono)"}}>No receipt attached</div>
             )}
             <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
+            {/* Receipt preview */}
+            {local.receipt?.url&&(
+              <div style={{marginTop:10,borderRadius:8,overflow:"hidden",border:"1px solid var(--border)",background:"var(--surface2)"}}>
+                {/\.(jpe?g|png|gif|webp)$/i.test(local.receipt.name||"")?
+                  <img src={local.receipt.url} alt="Receipt preview" style={{width:"100%",maxHeight:260,objectFit:"contain",display:"block"}}/>:
+                  <iframe src={local.receipt.url} title="Receipt preview" style={{width:"100%",height:260,border:"none",display:"block"}}/>
+                }
+              </div>
+            )}
           </div>
-
-          {isAdmin&&local.status==="submitted"&&(
-            <div>
-              <span className="sidebar-label">Flag reason (if rejecting)</span>
-              <input value={local.flagReason} onChange={e=>setLocal(t=>({...t,flagReason:e.target.value}))} placeholder="e.g. Wrong GL, missing memo..."/>
-            </div>
-          )}
         </div>
 
         <div style={{padding:"16px 24px",borderTop:"1px solid var(--border)",display:"flex",gap:8,flexWrap:"wrap"}}>
-          {isAdmin&&local.status==="submitted"&&(
-            <>
-              <button className="btn-success" style={{flex:1}} onClick={()=>{setLocal(t=>({...t,status:"approved"}));setTimeout(save,50);}}>✓ Approve</button>
-              <button className="btn-danger" style={{flex:1}} onClick={()=>{setLocal(t=>({...t,status:"flagged"}));setTimeout(save,50);}}>⚑ Flag</button>
-            </>
-          )}
           {canEdit&&<button className="btn-secondary" style={{flex:1}} onClick={save}>Save</button>}
           {!canEdit&&<button className="btn-secondary" style={{flex:1}} onClick={onClose}>Close</button>}
         </div>
@@ -1331,7 +1329,7 @@ function NSModal({ transactions, onClose, onDone }) {
   const [step,setStep]=useState(0);
   const [reconId]=useState(genReconId);
   const [ts]=useState(()=>new Date().toISOString());
-  const approved=transactions.filter(t=>t.status==="approved");
+  const approved=transactions.filter(t=>t.status==="ready");
   const total=approved.reduce((s,t)=>s+t.amount,0);
   const wReceipts=approved.filter(t=>t.receipt).length;
 
@@ -1578,14 +1576,12 @@ export default function App() {
 
   const counts={
     all:isUser?myTxs.length:transactions.length,
-    pending:transactions.filter(t=>t.status==="pending"&&(isUser?t.userId===currentUser?.id:true)).length,
-    submitted:transactions.filter(t=>t.status==="submitted").length,
-    approved:transactions.filter(t=>t.status==="approved").length,
-    flagged:transactions.filter(t=>t.status==="flagged"&&(isUser?t.userId===currentUser?.id:true)).length,
+    pending:(isUser?myTxs:transactions).filter(t=>t.status==="pending").length,
+    ready:(isUser?myTxs:transactions).filter(t=>t.status==="ready").length,
     exported:transactions.filter(t=>t.status==="exported").length,
   };
 
-  const approvedAmt=transactions.filter(t=>t.status==="approved").reduce((s,t)=>s+t.amount,0);
+  const readyAmt=(isUser?myTxs:transactions).filter(t=>t.status==="ready").reduce((s,t)=>s+t.amount,0);
   const totalAmt=vis.reduce((s,t)=>s+t.amount,0);
   const selectedTx=transactions.find(t=>t.id===selectedTxId);
 
@@ -1635,7 +1631,7 @@ export default function App() {
             {tabs.map(t=><button key={t} className={`nav-tab ${activeTab===t?"active":""}`} onClick={()=>setActiveTab(t)}>{tabLabel[t]}</button>)}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10,paddingLeft:16,flexShrink:0}}>
-            {isAdmin&&counts.approved>0&&(
+            {isAdmin&&counts.ready>0&&(
               <button className="btn-primary" style={{fontSize:12,padding:"7px 14px"}} onClick={()=>setShowNS(true)}>Export to NetSuite →</button>
             )}
             <div style={{position:"relative"}}>
@@ -1677,7 +1673,7 @@ export default function App() {
 
             {/* Stats */}
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(148px,1fr))",gap:12,marginBottom:24}}>
-              {[{l:"Total",v:fmt(totalAmt),s:`${vis.length} transactions`},{l:"Pending",v:counts.pending,s:"to review",c:"var(--amber)"},{l:"In Review",v:counts.submitted,s:"submitted",c:"var(--accent)"},{l:"Approved",v:fmt(approvedAmt),s:`${counts.approved} lines`,c:"var(--green)"},{l:"Flagged",v:counts.flagged,s:"need attention",c:"var(--red)"},{l:"Recurring",v:vis.filter(t=>t.isRecurring).length,s:"subscriptions",c:"var(--purple)"}].map(s=>(
+              {[{l:"Total",v:fmt(totalAmt),s:`${vis.length} transactions`},{l:"Missing Receipt",v:counts.pending,s:"need upload",c:"var(--amber)"},{l:"Receipt Attached",v:fmt(readyAmt),s:`${counts.ready} ready`,c:"var(--accent)"},{l:"Exported",v:counts.exported,s:"to NetSuite",c:"var(--green)"},{l:"Recurring",v:vis.filter(t=>t.isRecurring).length,s:"subscriptions",c:"var(--purple)"}].map(s=>(
                 <div key={s.l} className="stat-card">
                   <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>{s.l}</div>
                   <div style={{fontSize:22,fontWeight:700,color:s.c||"var(--text)",letterSpacing:"-0.03em"}}>{s.v}</div>
@@ -1690,20 +1686,20 @@ export default function App() {
             <div className="card" style={{padding:"14px 18px",marginBottom:20,display:"flex",alignItems:"center",gap:16}}>
               <div style={{flex:1}}>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--text3)",marginBottom:6}}>
-                  <span>Review progress</span>
-                  <span>{counts.approved} / {isUser?myTxs.length:transactions.length} approved</span>
+                  <span>Receipt coverage</span>
+                  <span>{counts.ready+counts.exported} / {isUser?myTxs.length:transactions.length} with receipt</span>
                 </div>
-                <div className="progress-bar"><div className="progress-fill" style={{width:`${(counts.approved/Math.max(isUser?myTxs.length:transactions.length,1))*100}%`}}/></div>
+                <div className="progress-bar"><div className="progress-fill" style={{width:`${((counts.ready+counts.exported)/Math.max(isUser?myTxs.length:transactions.length,1))*100}%`}}/></div>
               </div>
-              <span style={{fontSize:12,color:"var(--text3)",fontFamily:"var(--mono)"}}>{Math.round((counts.approved/Math.max(isUser?myTxs.length:transactions.length,1))*100)}%</span>
+              <span style={{fontSize:12,color:"var(--text3)",fontFamily:"var(--mono)"}}>{Math.round(((counts.ready+counts.exported)/Math.max(isUser?myTxs.length:transactions.length,1))*100)}%</span>
             </div>
 
             {/* Toolbar */}
             <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
               <div style={{display:"flex",background:"var(--surface)",borderRadius:10,border:"1px solid var(--border)",overflow:"hidden"}}>
-                {["all","pending","submitted","approved","flagged","exported"].map(f=>(
+                {["all","pending","ready","exported"].map(f=>(
                   <button key={f} onClick={()=>setFilterStatus(f)} style={{padding:"7px 11px",fontSize:11,border:"none",background:filterStatus===f?"var(--surface3)":"transparent",color:filterStatus===f?"var(--text)":"var(--text3)",fontFamily:"var(--mono)",fontWeight:filterStatus===f?600:400,transition:"all 0.15s"}}>
-                    {f.charAt(0).toUpperCase()+f.slice(1)}<span style={{opacity:0.5,marginLeft:4}}>({counts[f]??vis.length})</span>
+                    {{all:"All",pending:"Missing Receipt",ready:"Receipt Attached",exported:"Exported"}[f]||f}<span style={{opacity:0.5,marginLeft:4}}>({counts[f]??vis.length})</span>
                   </button>
                 ))}
               </div>
