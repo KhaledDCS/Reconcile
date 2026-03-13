@@ -127,11 +127,11 @@ const CSS = `
 
 // ── DATA ──────────────────────────────────────────────────────────────────────
 const INITIAL_USERS = [
-  { id: "u1", name: "Admin User",  email: "admin@company.com",  password: "admin123", role: "admin", active: true, card: null,         createdAt: "2025-01-01" },
-  { id: "u2", name: "Jordan Lee",  email: "jordan@company.com", password: "pass123",  role: "user",  active: true, card: "Visa ••4291", createdAt: "2025-01-10" },
-  { id: "u3", name: "Alex Kim",    email: "alex@company.com",   password: "pass123",  role: "user",  active: true, card: "Amex ••8812", createdAt: "2025-01-10" },
-  { id: "u4", name: "Morgan Chen", email: "morgan@company.com", password: "pass123",  role: "user",  active: true, card: "Visa ••4291", createdAt: "2025-01-15" },
-  { id: "u5", name: "Sam Rivera",  email: "sam@company.com",    password: "pass123",  role: "user",  active: true, card: null,         createdAt: "2025-01-05" },
+  { id: "u1", name: "Admin User",  email: "admin@company.com",  password: "admin123", role: "admin", active: true, createdAt: "2025-01-01" },
+  { id: "u2", name: "Jordan Lee",  email: "jordan@company.com", password: "pass123",  role: "user",  active: true, createdAt: "2025-01-10" },
+  { id: "u3", name: "Alex Kim",    email: "alex@company.com",   password: "pass123",  role: "user",  active: true, createdAt: "2025-01-10" },
+  { id: "u4", name: "Morgan Chen", email: "morgan@company.com", password: "pass123",  role: "user",  active: true, createdAt: "2025-01-15" },
+  { id: "u5", name: "Sam Rivera",  email: "sam@company.com",    password: "pass123",  role: "user",  active: true, createdAt: "2025-01-05" },
 ];
 
 const INITIAL_CARDS = [
@@ -442,7 +442,7 @@ const sanitizeInput = s => String(s).replace(/[<>"'`;]/g,"").trim();
 
 function UserMgmt({ users, onUpdate }) {
   const [showAdd,setShowAdd]=useState(false);
-  const [form,setForm]=useState({name:"",email:"",password:"",role:"user",card:""});
+  const [form,setForm]=useState({name:"",email:"",password:"",role:"user"});
   const [addErr,setAddErr]=useState("");
   const [editId,setEditId]=useState(null);
   const [editForm,setEditForm]=useState({});
@@ -472,10 +472,9 @@ function UserMgmt({ users, onUpdate }) {
         email: sanitizeInput(form.email).toLowerCase(),
         password: sanitizeInput(form.password),
         role: form.role,
-        card: sanitizeInput(form.card),
       });
       onUpdate([...users,{...newUser,createdAt:newUser.created_at}]);
-      setForm({name:"",email:"",password:"",role:"user",card:""});
+      setForm({name:"",email:"",password:"",role:"user"});
       setShowAdd(false);setAddErr("");
     }catch(e){setAddErr("Failed to create user.");}
     setSaving(false);
@@ -489,7 +488,6 @@ function UserMgmt({ users, onUpdate }) {
         name: sanitizeInput(editForm.name),
         email: sanitizeInput(editForm.email).toLowerCase(),
         role: editForm.role,
-        card: sanitizeInput(editForm.card||""),
       });
       onUpdate(users.map(u=>u.id===editId?{...u,...editForm,email:sanitizeInput(editForm.email).toLowerCase()}:u));
       setEditId(null);setEditErr("");
@@ -539,10 +537,7 @@ function UserMgmt({ users, onUpdate }) {
               <Av name={u.name} color={ROLE_COLOR[u.role]} size={32}/>
               <div>
                 <div style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{u.name}</div>
-                <div style={{display:"flex",gap:6,alignItems:"center",marginTop:2}}>
-                  {u.card&&<span style={{fontSize:11,color:"var(--text3)",fontFamily:"var(--mono)"}}>{u.card}</span>}
-                  {!u.active&&<span className="tag tag-red" style={{fontSize:9}}>Inactive</span>}
-                </div>
+                {!u.active&&<div style={{marginTop:2}}><span className="tag tag-red" style={{fontSize:9}}>Inactive</span></div>}
               </div>
             </div>
             <div style={{fontSize:12,color:"var(--text2)",fontFamily:"var(--mono)",alignSelf:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email}</div>
@@ -550,7 +545,7 @@ function UserMgmt({ users, onUpdate }) {
               <RoleTag role={u.role}/>
             </div>
             <div style={{alignSelf:"center",display:"flex",gap:6,justifyContent:"flex-end"}}>
-              <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px"}} title="Edit user" onClick={()=>{setEditId(u.id);setEditForm({name:u.name,email:u.email,role:u.role,card:u.card||""});}}>✎</button>
+              <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px"}} title="Edit user" onClick={()=>{setEditId(u.id);setEditForm({name:u.name,email:u.email,role:u.role});}}>✎</button>
               <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px"}} title="Reset password" onClick={()=>{setResetId(u.id);setResetPw("");setResetErr("");setResetOk(false);}}>🔑</button>
               <button className="btn-ghost" style={{fontSize:11,padding:"4px 8px",color:u.active?"var(--red)":"var(--green)"}} title={u.active?"Deactivate":"Activate"} onClick={async()=>{await api.updateUser(u.id,{active:!u.active});onUpdate(users.map(x=>x.id===u.id?{...x,active:!x.active}:x));}}>
                 {u.active?"⊘":"✓"}
@@ -569,7 +564,7 @@ function UserMgmt({ users, onUpdate }) {
               <button className="btn-ghost" onClick={()=>{setShowAdd(false);setAddErr("");}}>✕</button>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:18}}>
-              {[{l:"Full Name",k:"name",t:"text",p:"Jane Smith"},{l:"Email",k:"email",t:"email",p:"jane@company.com"},{l:"Password",k:"password",t:"password",p:"Min 6 chars + special character"},{l:"Card (optional)",k:"card",t:"text",p:"Visa ••1234"}].map(f=>(
+              {[{l:"Full Name",k:"name",t:"text",p:"Jane Smith"},{l:"Email",k:"email",t:"email",p:"jane@company.com"},{l:"Password",k:"password",t:"password",p:"Min 6 chars + special character"}].map(f=>(
                 <div key={f.k} className="input-group">
                   <label className="input-label">{f.l}</label>
                   <input type={f.t} value={form[f.k]} placeholder={f.p} onChange={e=>setForm(p=>({...p,[f.k]:e.target.value}))}/>
@@ -601,7 +596,7 @@ function UserMgmt({ users, onUpdate }) {
               <button className="btn-ghost" onClick={()=>{setEditId(null);setEditErr("");}}>✕</button>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:18}}>
-              {[{l:"Full Name",k:"name",t:"text"},{l:"Email",k:"email",t:"email"},{l:"Card (optional)",k:"card",t:"text",p:"Visa ••1234"}].map(f=>(
+              {[{l:"Full Name",k:"name",t:"text"},{l:"Email",k:"email",t:"email"}].map(f=>(
                 <div key={f.k} className="input-group">
                   <label className="input-label">{f.l}</label>
                   <input type={f.t} value={editForm[f.k]||""} placeholder={f.p||""} onChange={e=>setEditForm(p=>({...p,[f.k]:e.target.value}))}/>
@@ -1471,6 +1466,10 @@ export default function App() {
   // derive available months from all transactions
   const availableMonths = [...new Set(transactions.map(t=>t.date.slice(0,7)))].sort();
 
+  // derive filterable cards based on role
+  const userVisibleCardNames = isUser ? [...new Set(transactions.filter(t=>t.userId===currentUser?.id).map(t=>t.card).filter(Boolean))] : [];
+  const filterableCards = isAdmin ? cards.filter(c=>c.active) : cards.filter(c=>userVisibleCardNames.includes(c.name));
+
   const vis=transactions.filter(t=>{
     if(isUser&&t.userId!==currentUser.id)return false;
     if(filterStatus!=="all"&&t.status!==filterStatus)return false;
@@ -1625,10 +1624,10 @@ export default function App() {
                   {users.filter(u=>u.role==="user").map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
               )}
-              {isAdmin&&(
+              {(isAdmin || filterableCards.length > 1)&&(
                 <select value={filterCard} onChange={e=>setFilterCard(e.target.value)} style={{width:"auto",minWidth:160,fontSize:12}}>
                   <option value="all">All cards</option>
-                  {cards.filter(c=>c.active).map(c=><option key={c.id} value={c.name}>{c.name} · {c.division}</option>)}
+                  {filterableCards.map(c=><option key={c.id} value={c.name}>{c.name}{isAdmin?` · ${c.division}`:""}</option>)}
                 </select>
               )}
               <input type="text" placeholder="Search vendor or description..." value={search} onChange={e=>setSearch(e.target.value)} style={{width:220}}/>
@@ -1640,8 +1639,8 @@ export default function App() {
 
             {/* Table */}
             <div className="card" style={{overflow:"hidden"}}>
-              <div style={{display:"grid",gridTemplateColumns:"82px 1fr 1fr 96px 96px 110px 80px 80px 28px",padding:"10px 16px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em"}}>
-                <span>Date</span><span>Vendor</span><span>Category · Dept</span><span>User</span><span>Assignee</span><span style={{textAlign:"right"}}>Amount</span><span style={{textAlign:"center"}}>Receipt</span><span style={{textAlign:"center"}}>Status</span><span/>
+              <div style={{display:"grid",gridTemplateColumns:"82px 1fr 1fr 120px 96px 110px 80px 80px 28px",padding:"10px 16px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em"}}>
+                <span>Date</span><span>Vendor</span><span>Category · Dept</span><span>Card</span><span>Assignee</span><span style={{textAlign:"right"}}>Amount</span><span style={{textAlign:"center"}}>Receipt</span><span style={{textAlign:"center"}}>Status</span><span/>
               </div>
               <div style={{overflowY:"auto",maxHeight:"calc(100vh - 420px)"}}>
                 {vis.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--text3)",fontSize:13}}>No transactions match your filters.</div>}
@@ -1651,7 +1650,7 @@ export default function App() {
                   const cat=CATEGORIES.find(c=>c.id===t.categoryId);
                   return(
                     <div key={t.id} className={"tx-row"+(selectedTxId===t.id?" selected":"")}
-                      style={{display:"grid",gridTemplateColumns:"82px 1fr 1fr 96px 96px 110px 80px 80px 28px",alignItems:"center",padding:"11px 16px",cursor:"pointer"}}
+                      style={{display:"grid",gridTemplateColumns:"82px 1fr 1fr 120px 96px 110px 80px 80px 28px",alignItems:"center",padding:"11px 16px",cursor:"pointer"}}
                       onClick={()=>setSelectedTxId(t.id)}>
                       <span style={{fontSize:12,color:"var(--text3)",fontFamily:"var(--mono)"}}>{fmtDate(t.date)}</span>
                       <div>
@@ -1672,7 +1671,7 @@ export default function App() {
                           {t.reconId&&<span style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--accent)",background:"var(--accent-dim)",borderRadius:4,padding:"1px 5px",border:"1px solid var(--accent-border)"}}>{t.reconId}</span>}
                         </div>
                       </div>
-                      <span style={{fontSize:12,color:"var(--text2)"}}>{owner?.name.split(" ")[0]||"—"}</span>
+                      <span style={{fontSize:11,color:"var(--text2)",fontFamily:"var(--mono)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.card||"—"}</span>
                       <div style={{display:"flex",alignItems:"center",gap:5}}>
                         {assignee?<><Av name={assignee.name} color={ROLE_COLOR[assignee.role]} size={20}/><span style={{fontSize:11,color:"var(--text2)"}}>{assignee.name.split(" ")[0]}</span>{t.autoAssignee&&<span style={{fontSize:9,color:"var(--purple)"}}>⚡</span>}</>:<span style={{fontSize:11,color:"var(--text3)"}}>—</span>}
                       </div>
