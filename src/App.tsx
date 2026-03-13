@@ -584,14 +584,22 @@ function UserMgmt({ users, onUpdate, cards }) {
               </div>
               <div className="input-group">
                 <label className="input-label">Assigned Cards (optional)</label>
-                <div style={{display:"flex",flexDirection:"column",gap:6,padding:"8px 10px",border:"1px solid var(--border)",borderRadius:6,background:"var(--surface)"}}>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
                   {(cards||[]).filter(c=>c.active).length===0&&<span style={{fontSize:12,color:"var(--text3)"}}>No active cards</span>}
-                  {(cards||[]).filter(c=>c.active).map(c=>(
-                    <label key={c.id} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13,color:"var(--text)"}}>
-                      <input type="checkbox" checked={form.card.includes(c.name)} onChange={e=>setForm(p=>({...p,card:e.target.checked?[...p.card,c.name]:p.card.filter(x=>x!==c.name)}))} style={{accentColor:"var(--primary)"}}/>
-                      <span>{c.name}</span><span style={{fontSize:11,color:"var(--text3)"}}>· {c.division}</span>
-                    </label>
-                  ))}
+                  {(cards||[]).filter(c=>c.active).map(c=>{
+                    const sel=form.card.includes(c.name);
+                    const nc=c.network==='Visa'?'#0070d2':c.network==='Amex'?'#0f766e':c.network==='Mastercard'?'#d97706':'#706e6b';
+                    return (
+                      <div key={c.id} onClick={()=>setForm(p=>({...p,card:sel?p.card.filter(x=>x!==c.name):[...p.card,c.name]}))} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",border:`1.5px solid ${sel?"var(--primary)":"var(--border)"}`,borderRadius:8,cursor:"pointer",background:sel?"rgba(0,112,210,0.04)":"var(--surface)",userSelect:"none",transition:"border-color 0.1s,background 0.1s"}}>
+                        <div style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${sel?"var(--primary)":"var(--border)"}`,background:sel?"var(--primary)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:10,color:"#fff",fontWeight:700,lineHeight:1}}>{sel&&"✓"}</div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:600,color:"var(--text)",fontFamily:"var(--mono)"}}>{c.name}</div>
+                          <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>{c.division}</div>
+                        </div>
+                        <span style={{fontSize:9,fontWeight:700,letterSpacing:"0.07em",color:nc,background:nc+'18',padding:"3px 7px",borderRadius:4,textTransform:"uppercase"}}>{c.network}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -628,14 +636,22 @@ function UserMgmt({ users, onUpdate, cards }) {
               </div>
               <div className="input-group">
                 <label className="input-label">Assigned Cards (optional)</label>
-                <div style={{display:"flex",flexDirection:"column",gap:6,padding:"8px 10px",border:"1px solid var(--border)",borderRadius:6,background:"var(--surface)"}}>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
                   {(cards||[]).filter(c=>c.active).length===0&&<span style={{fontSize:12,color:"var(--text3)"}}>No active cards</span>}
-                  {(cards||[]).filter(c=>c.active).map(c=>(
-                    <label key={c.id} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13,color:"var(--text)"}}>
-                      <input type="checkbox" checked={(editForm.card||[]).includes(c.name)} onChange={e=>setEditForm(p=>({...p,card:e.target.checked?[...(p.card||[]),c.name]:(p.card||[]).filter(x=>x!==c.name)}))} style={{accentColor:"var(--primary)"}}/>
-                      <span>{c.name}</span><span style={{fontSize:11,color:"var(--text3)"}}>· {c.division}</span>
-                    </label>
-                  ))}
+                  {(cards||[]).filter(c=>c.active).map(c=>{
+                    const sel=(editForm.card||[]).includes(c.name);
+                    const nc=c.network==='Visa'?'#0070d2':c.network==='Amex'?'#0f766e':c.network==='Mastercard'?'#d97706':'#706e6b';
+                    return (
+                      <div key={c.id} onClick={()=>setEditForm(p=>({...p,card:sel?(p.card||[]).filter(x=>x!==c.name):[...(p.card||[]),c.name]}))} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",border:`1.5px solid ${sel?"var(--primary)":"var(--border)"}`,borderRadius:8,cursor:"pointer",background:sel?"rgba(0,112,210,0.04)":"var(--surface)",userSelect:"none",transition:"border-color 0.1s,background 0.1s"}}>
+                        <div style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${sel?"var(--primary)":"var(--border)"}`,background:sel?"var(--primary)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:10,color:"#fff",fontWeight:700,lineHeight:1}}>{sel&&"✓"}</div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:600,color:"var(--text)",fontFamily:"var(--mono)"}}>{c.name}</div>
+                          <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>{c.division}</div>
+                        </div>
+                        <span style={{fontSize:9,fontWeight:700,letterSpacing:"0.07em",color:nc,background:nc+'18',padding:"3px 7px",borderRadius:4,textTransform:"uppercase"}}>{c.network}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
