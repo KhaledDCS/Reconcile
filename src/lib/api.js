@@ -2,7 +2,11 @@ import { supabase } from './supabase';
 export async function getUsers() {
   const { data, error } = await supabase.from('users').select('*').order('created_at');
   if (error) throw error;
-  return data.map(u => ({ id: u.id, name: u.name, email: u.email, password: u.password, role: u.role, active: u.active, card: u.card, createdAt: u.created_at }));
+  return data.map(u => {
+    let card = u.card;
+    if (typeof card === 'string' && card.startsWith('[')) { try { const p = JSON.parse(card); card = Array.isArray(p) ? p[0] || null : card; } catch {} }
+    return { id: u.id, name: u.name, email: u.email, password: u.password, role: u.role, active: u.active, card, createdAt: u.created_at };
+  });
 }
 export async function loginUser(email, password) {
   const { data, error } = await supabase.from('users').select('*').eq('email', email).eq('password', password).eq('active', true).single();

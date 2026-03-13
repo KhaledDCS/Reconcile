@@ -1158,7 +1158,7 @@ function CreditCardSettings({ cards, onUpdate }) {
 
       {/* Cards list */}
       <div style={{border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
-        <div style={{display:"grid",gridTemplateColumns:"32px 1fr 80px 80px 140px 80px 160px",gap:12,padding:"8px 14px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em",alignItems:"center"}}>
+        <div style={{display:"grid",gridTemplateColumns:"32px 1fr 80px 80px 140px 80px 180px",gap:12,padding:"8px 14px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:"0.08em",alignItems:"center"}}>
           <span/>
           <span>Card</span>
           <span>Network</span>
@@ -1170,7 +1170,7 @@ function CreditCardSettings({ cards, onUpdate }) {
         {cards.map((c,i)=>(
           <div key={c.id} style={{borderBottom:i<cards.length-1?"1px solid var(--border)":"none",opacity:c.active?1:0.5}}>
             {editId===c.id?(
-              <div style={{display:"grid",gridTemplateColumns:"32px 1fr 80px 80px 140px 80px 160px",gap:12,padding:"10px 14px",alignItems:"center",background:"var(--accent-dim)"}}>
+              <div style={{display:"grid",gridTemplateColumns:"32px 1fr 80px 80px 140px 80px 180px",gap:12,padding:"10px 14px",alignItems:"center",background:"var(--accent-dim)"}}>
                 <div style={{width:28,height:28,borderRadius:6,background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>
                   {c.network==="Visa"?"💳":c.network==="Amex"?"🟦":c.network==="Mastercard"?"🔴":"💳"}
                 </div>
@@ -1185,7 +1185,7 @@ function CreditCardSettings({ cards, onUpdate }) {
                 </div>
               </div>
             ):(
-              <div style={{display:"grid",gridTemplateColumns:"32px 1fr 80px 80px 140px 80px 160px",gap:12,padding:"11px 14px",alignItems:"center"}}>
+              <div style={{display:"grid",gridTemplateColumns:"32px 1fr 80px 80px 140px 80px 180px",gap:12,padding:"11px 14px",alignItems:"center"}}>
                 <div style={{width:28,height:28,borderRadius:6,background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>
                   {c.network==="Visa"?"💳":c.network==="Amex"?"🟦":c.network==="Mastercard"?"🔴":"💳"}
                 </div>
