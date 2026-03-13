@@ -1563,6 +1563,7 @@ export default function App() {
     if(u){
       const session={...u,role:u.role,name:u.name,id:u.id,card:u.card};
       setCurrentUser(session);
+      setActiveTab("transactions");
       try{localStorage.setItem("recon_session",JSON.stringify(session));}catch(e){}
     }
     return u;
@@ -1683,13 +1684,7 @@ export default function App() {
                   return <option key={m} value={m}>{MONTHS[+mo-1]} {y}</option>;
                 })}
               </select>
-              {isAdmin&&(
-                <select value={filterUser} onChange={e=>setFilterUser(e.target.value)} style={{width:"auto",minWidth:160,fontSize:12}}>
-                  <option value="all">All users</option>
-                  {users.filter(u=>u.role==="user").map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
-                </select>
-              )}
-              {(isAdmin || filterableCards.length > 1)&&(
+              {filterableCards.length > 0&&(
                 <select value={filterCard} onChange={e=>setFilterCard(e.target.value)} style={{width:"auto",minWidth:160,fontSize:12}}>
                   <option value="all">All cards</option>
                   {filterableCards.map(c=><option key={c.id} value={c.name}>{c.name}{isAdmin?` · ${c.division}`:""}</option>)}
