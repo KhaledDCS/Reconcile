@@ -135,9 +135,9 @@ const INITIAL_USERS = [
 ];
 
 const INITIAL_CARDS = [
-  { id: "c1", name: "Visa ••4291",  network: "Visa",  last4: "4291", division: "Engineering", active: true },
-  { id: "c2", name: "Amex ••8812",  network: "Amex",  last4: "8812", division: "Operations",  active: true },
-  { id: "c3", name: "MC ••3301",    network: "MC",    last4: "3301", division: "Sales",        active: false },
+  { id: "c1", name: "Visa ••4291",  network: "Visa",  last4: "4291", division: "Engineering", active: true,  assigneeId: "u2" },
+  { id: "c2", name: "Amex ••8812",  network: "Amex",  last4: "8812", division: "Operations",  active: true,  assigneeId: "u3" },
+  { id: "c3", name: "MC ••3301",    network: "MC",    last4: "3301", division: "Sales",        active: false, assigneeId: null },
 ];
 
 const CATEGORIES = [
@@ -1070,9 +1070,9 @@ function StatementModal({ myTxs, onConfirm, onClose }) {
 
 // ── NETSUITE MODAL ────────────────────────────────────────────────────────────
 // ── CREDIT CARD SETTINGS ─────────────────────────────────────────────────────
-function CreditCardSettings({ cards, onUpdate }) {
+function CreditCardSettings({ cards, onUpdate, users }) {
   const [showAdd,setShowAdd]=useState(false);
-  const [form,setForm]=useState({name:"",network:"Visa",last4:"",division:""});
+  const [form,setForm]=useState({name:"",network:"Visa",last4:"",division:"",assigneeId:""});
   const [err,setErr]=useState("");
   const [editId,setEditId]=useState(null);
   const [editForm,setEditForm]=useState({});
@@ -1083,9 +1083,9 @@ function CreditCardSettings({ cards, onUpdate }) {
     if(cards.find(c=>c.name===form.name)){setErr("Card name already exists.");return;}
     setSaving(true);
     try{
-      const newCard=await api.createCard({...form,active:true});
-      onUpdate([...cards,{id:newCard.id,name:newCard.name,network:newCard.network,last4:newCard.last4,division:newCard.division,active:newCard.active}]);
-      setForm({name:"",network:"Visa",last4:"",division:""});setShowAdd(false);setErr("");
+      const newCard=await api.createCard({...form,assignee_id:form.assigneeId||null,active:true});
+      onUpdate([...cards,{id:newCard.id,name:newCard.name,network:newCard.network,last4:newCard.last4,division:newCard.division,active:newCard.active,assigneeId:form.assigneeId||null}]);
+      setForm({name:"",network:"Visa",last4:"",division:"",assigneeId:""});setShowAdd(false);setErr("");
     }catch(e){setErr("Failed to save. Try again.");}
     setSaving(false);
   };
@@ -1094,7 +1094,7 @@ function CreditCardSettings({ cards, onUpdate }) {
   const saveEdit=async()=>{
     setSaving(true);
     try{
-      await api.updateCard(editId,{name:editForm.name,division:editForm.division});
+      await api.updateCard(editId,{name:editForm.name,division:editForm.division,assignee_id:editForm.assigneeId||null});
       onUpdate(cards.map(c=>c.id===editId?{...editForm}:c));
       setEditId(null);
     }catch(e){setErr("Failed to save.");}
@@ -1128,6 +1128,13 @@ function CreditCardSettings({ cards, onUpdate }) {
             </div>
             <div className="input-group"><label className="input-label">Last 4 Digits</label><input value={form.last4} onChange={e=>setForm(p=>({...p,last4:e.target.value.slice(0,4)}))} placeholder="4291" maxLength={4}/></div>
             <div className="input-group"><label className="input-label">Division</label><input value={form.division} onChange={e=>setForm(p=>({...p,division:e.target.value}))} placeholder="e.g. Engineering"/></div>
+            <div className="input-group" style={{gridColumn:"1/-1"}}>
+              <label className="input-label">Assignee (optional)</label>
+              <select value={form.assigneeId} onChange={e=>setForm(p=>({...p,assigneeId:e.target.value}))}>
+                <option value="">— Unassigned —</option>
+                {(users||[]).filter(u=>u.active).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
           </div>
           {err&&<div className="alert-error" style={{marginBottom:10}}>{err}</div>}
           <div style={{display:"flex",gap:8}}>
@@ -1140,7 +1147,7 @@ function CreditCardSettings({ cards, onUpdate }) {
       {/* Cards list */}
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {cards.map(c=>(
-          <div key={c.id} style={{display:"grid",gridTemplateColumns:"40px 1fr 120px 100px 90px",gap:12,alignItems:"center",padding:"12px 14px",background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)",opacity:c.active?1:0.5}}>
+          <div key={c.id} style={{display:"grid",gridTemplateColumns:"40px 1fr 120px 160px 100px 90px",gap:12,alignItems:"center",padding:"12px 14px",background:"var(--surface2)",borderRadius:10,border:"1px solid var(--border)",opacity:c.active?1:0.5}}>
             <div style={{width:32,height:32,borderRadius:8,background:"var(--surface3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>
               {c.network==="Visa"?"💳":c.network==="Amex"?"🟦":c.network==="Mastercard"?"🔴":"💳"}
             </div>
@@ -1148,6 +1155,10 @@ function CreditCardSettings({ cards, onUpdate }) {
               <>
                 <input value={editForm.name} onChange={e=>setEditForm(p=>({...p,name:e.target.value}))} style={{fontSize:12}} placeholder="Card name"/>
                 <input value={editForm.division} onChange={e=>setEditForm(p=>({...p,division:e.target.value}))} style={{fontSize:12}} placeholder="Division"/>
+                <select value={editForm.assigneeId||""} onChange={e=>setEditForm(p=>({...p,assigneeId:e.target.value}))} style={{fontSize:12}}>
+                  <option value="">— Unassigned —</option>
+                  {(users||[]).filter(u=>u.active).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
                 <button className="btn-success" style={{fontSize:11,padding:"5px 10px"}} onClick={saveEdit} disabled={saving}>{saving?"…":"Save"}</button>
                 <button className="btn-ghost" style={{fontSize:11}} onClick={()=>setEditId(null)}>Cancel</button>
               </>
@@ -1158,6 +1169,9 @@ function CreditCardSettings({ cards, onUpdate }) {
                   <div style={{fontSize:11,color:"var(--text3)"}}>{c.network} · ••{c.last4} · {c.active?"Active":"Inactive"}</div>
                 </div>
                 <span style={{fontSize:12,background:"var(--accent-dim)",color:"var(--accent)",borderRadius:6,padding:"3px 10px",border:"1px solid var(--accent-border)",textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.division||"—"}</span>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  {c.assigneeId?(()=>{const u=(users||[]).find(x=>x.id===c.assigneeId);return u?<><Av name={u.name} color={ROLE_COLOR[u.role]} size={20}/><span style={{fontSize:12,color:"var(--text2)"}}>{u.name.split(" ")[0]}</span></>:<span style={{fontSize:12,color:"var(--text3)"}}>—</span>;})():<span style={{fontSize:12,color:"var(--text3)"}}>—</span>}
+                </div>
                 <button className="btn-ghost" style={{fontSize:11}} onClick={()=>startEdit(c)}>✎ Edit</button>
                 <button className={c.active?"btn-danger":"btn-success"} style={{fontSize:11,padding:"5px 10px"}} onClick={()=>toggleActive(c)}>
                   {c.active?"Deactivate":"Activate"}
@@ -1776,7 +1790,7 @@ export default function App() {
             <div style={{fontSize:18,fontWeight:700,color:"var(--text)",letterSpacing:"-0.02em",marginBottom:24}}>Settings</div>
 
             {/* ── CREDIT CARDS ── */}
-            <CreditCardSettings cards={cards} onUpdate={setCards}/>
+            <CreditCardSettings cards={cards} onUpdate={setCards} users={users}/>
 
             <div className="card" style={{padding:24,marginBottom:16}}>
               <div style={{fontSize:14,fontWeight:600,color:"var(--text)",marginBottom:4}}>Expense Categories</div>

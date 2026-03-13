@@ -86,7 +86,7 @@ export async function bulkUpdateStatus(ids, status, reconId) {
 export async function getCards() {
   const { data, error } = await supabase.from('cards').select('*').order('created_at');
   if (error) throw error;
-  return data.map(c => ({ id: c.id, name: c.name, network: c.network, last4: c.last4, division: c.division, active: c.active }));
+  return data.map(c => ({ id: c.id, name: c.name, network: c.network, last4: c.last4, division: c.division, active: c.active, assigneeId: c.assignee_id || null }));
 }
 export async function createCard(card) {
   const id = 'c' + Date.now();
