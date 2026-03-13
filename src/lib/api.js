@@ -2,7 +2,8 @@ import { supabase } from './supabase';
 export async function getUsers() {
   const { data, error } = await supabase.from('users').select('*').order('created_at');
   if (error) throw error;
-  return data.map(u => ({ id: u.id, name: u.name, email: u.email, password: u.password, role: u.role, active: u.active, card: u.card, createdAt: u.created_at }));
+  const parseCards = raw => { if(!raw)return[]; try{const p=JSON.parse(raw);return Array.isArray(p)?p:[raw];}catch{return[raw];} };
+  return data.map(u => ({ id: u.id, name: u.name, email: u.email, password: u.password, role: u.role, active: u.active, cards: parseCards(u.card), createdAt: u.created_at }));
 }
 export async function loginUser(email, password) {
   const { data, error } = await supabase.from('users').select('*').eq('email', email).eq('password', password).eq('active', true).single();
